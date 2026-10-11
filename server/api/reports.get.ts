@@ -1,17 +1,30 @@
-import { db } from '../utils/db'
+export default defineEventHandler(async (event) => {
+  const [tix, vio]: any[] = await Promise.all([
+    djangoFetch(event, '/api/tickets/'),
+    djangoFetch(event, '/api/violations/'),
+  ])
+  const tickets = Array.isArray(tix) ? tix : tix.results ?? []
+  const violations = Array.isArray(vio) ? vio : vio.results ?? []
 
-export default defineEventHandler(async () => {
-  const { rows } = await db.query(`
-    SELECT
-      to_char(date_trunc('month', v.apprehension_dt), 'FMMonth YYYY') AS month,
-      COUNT(DISTINCT v.id)::int AS total,
-      COUNT(DISTINCT v.id) FILTER (WHERE v.white_paid OR v.yellow_paid)::int AS settled,
-      COUNT(DISTINCT v.id) FILTER (WHERE NOT (v.white_paid OR v.yellow_paid))::int AS pending,
-      COALESCE(SUM(t.fine_amount) FILTER (WHERE t.paid_at IS NOT NULL), 0)::float AS revenue
-    FROM violation v
-    LEFT JOIN ticket t ON t.violation_id = v.id
-    GROUP BY date_trunc('month', v.apprehension_dt)
-    ORDER BY date_trunc('month', v.apprehension_dt) DESC
-  `)
-  return rows
+  const fines: Record<number, number> = {}
+  for (const v of violations) fines[v.id] = Number(v.fine_amount) || 0
+
+  const months: Record<string, any> = {}
+  for (const t of tickets) {
+    const d = new Date(t.date_issued)
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    const label = d.toLocaleString('en-US', { month: 'long', year: 'numeric' })
+    const m = (months[key] ??= { key, month: label, total: 0, settled: 0, pending: 0, revenue: 0 })
+    m.total++
+    if (t.status === 'paid') {
+      m.settled++
+      m.revenue += fines[t.violation] ?? 0
+    } else {
+      m.pending++
+    }
+  }
+
+  return Object.values(months)
+    .sort((a: any, b: any) => b.key.localeCompare(a.key))
+    .map(({ key, ...rest }: any) => rest)
 })
