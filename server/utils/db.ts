@@ -1,13 +1,16 @@
 import pg from 'pg'
 
-const url = process.env.DATABASE_URL
+let pool: pg.Pool | null = null
 
-if (!url) {
-  throw new Error('DATABASE_URL is missing')
+function getPool() {
+  if (!pool) {
+    const url = process.env.DATABASE_URL
+    if (!url) throw new Error('DATABASE_URL is missing')
+    pool = new pg.Pool({ connectionString: url })
+  }
+  return pool
 }
 
-console.log('DB host:', new URL(url).host)
-
-export const db = new pg.Pool({
-  connectionString: url,
-})
+export const db = {
+  query: (...args: Parameters<pg.Pool['query']>) => getPool().query(...args),
+}

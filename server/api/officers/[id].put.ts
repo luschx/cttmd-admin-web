@@ -11,33 +11,20 @@ export default defineEventHandler(async (event) => {
   if (!name?.trim() || !badge_id?.trim()) {
     throw createError({ statusCode: 400, statusMessage: 'Name and badge ID are required.' })
   }
-
-  try {
-    const hash = password ? await bcrypt.hash(password, 10) : null
-
-    const { rows } = await db.query(
-      `UPDATE officer
-       SET name = $1, badge_id = $2, is_active = $3, password = COALESCE($4, password)
-       WHERE id = $5
-       RETURNING id, name, badge_id, is_active`,
-      [name.trim(), badge_id.trim(), is_active ?? true, hash, id]
-    )
-
-    if (!rows.length) {
-      throw createError({ statusCode: 404, statusMessage: 'Officer not found.' })
-    }
-    return rows[0]
-  } catch (err: any) {
-    if (err.statusCode) throw err
-
-    if (err.code === '23505') {
-      throw createError({ statusCode: 409, statusMessage: 'That badge ID already exists.' })
-    }
-
-    console.error(err)
-    throw createError({
-      statusCode: 500,
-      statusMessage: err.message || 'Failed to update officer.',
-    })
+  if (password && password.length < 6) {
+    throw createError({ statusCode: 400, statusMessage: 'Password must be at least 6 characters.' })
   }
+
+  const body: any = {
+    full_name: name.trim(),
+    badge_id: badge_id.trim(),
+    is_on_duty: is_active ?? true,
+  }
+  if (password) body.password = password
+
+  const updated = await djangoFetch(event, `/api/enforcers/${id}/`, {
+    method: 'PATCH',
+    body,
+  })
+  return mapEnforcer(updated)
 })
