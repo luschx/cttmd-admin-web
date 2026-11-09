@@ -1,12 +1,9 @@
-import bcrypt from 'bcryptjs'
-import { db } from '../../utils/db'
-
 export default defineEventHandler(async (event) => {
   const id = Number(getRouterParam(event, 'id'))
   const { name, badge_id, password, is_active } = await readBody(event)
 
   if (!Number.isInteger(id)) {
-    throw createError({ statusCode: 400, statusMessage: 'Invalid officer id.' })
+    throw createError({ statusCode: 400, statusMessage: 'Invalid enforcer id.' })
   }
   if (!name?.trim() || !badge_id?.trim()) {
     throw createError({ statusCode: 400, statusMessage: 'Name and badge ID are required.' })
