@@ -1,6 +1,9 @@
 export default defineEventHandler(async (event) => {
   const { q = '', status = '' } = getQuery(event)
-  const query = new URLSearchParams({ q: String(q), status: String(status) }).toString()
+  const query = new URLSearchParams({
+    q: String(q),
+    status: String(status).toLowerCase(),
+  }).toString()
   const data = await djangoFetch(event, `/api/admin/tickets/search/?${query}`)
 
   const base = String(useRuntimeConfig(event).djangoBaseUrl ?? '').replace(/\/$/, '')

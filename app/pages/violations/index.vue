@@ -14,6 +14,7 @@
           <option value="">All status</option>
           <option>Unpaid</option>
           <option>Paid</option>
+          <option>Declined</option>
         </select>
         <svg class="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6B7A99]" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M5 8l5 5 5-5" />
@@ -342,6 +343,7 @@ function statusClass(status: string) {
     {
       Unpaid: 'bg-[#FDEBC8] text-[#D98A12]',
       Paid: 'bg-[#DCF5E4] text-[#1F9D55]',
+      Declined: 'bg-[#FDE3E3] text-[#D93A3A]',
     } as Record<string, string>
   )[status] ?? 'bg-[#F0F4FB] text-[#6B7A99]'
 }

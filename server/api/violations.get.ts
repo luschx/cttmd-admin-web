@@ -7,6 +7,12 @@ export default defineEventHandler(async (event) => {
   // e.g. /^(localhost|127\.|10\.|192\.168\.|old-domain\.com|203\.0\.113\.5)/
   const OLD_HOSTS = /^(localhost|127\.|10\.|192\.168\.)/
 
+  const STATUS_MAP: Record<string, string> = {
+    paid: 'Paid',
+    unpaid: 'Unpaid',
+    declined: 'Declined',
+  }
+
   const abs = (u: string) => {
     if (/^https?:\/\//.test(u)) {
       try {
@@ -73,7 +79,7 @@ export default defineEventHandler(async (event) => {
       location: t.location,
       violation: t.violation,
       datetime: date_issued,
-      status: t.status === 'paid' ? 'Paid' : 'Unpaid',
+      status: STATUS_MAP[String(t.status ?? '').toLowerCase()] ?? 'Unpaid',
       ...media(t),
       officers: enforcer_badge
         ? { name: enforcer_name, officer_code: enforcer_badge }
