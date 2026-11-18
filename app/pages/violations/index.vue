@@ -40,7 +40,7 @@
           <tbody class="divide-y divide-[#F0F4FB]">
             <tr
               v-for="row in paginated"
-              :key="row.id"
+              :key="row.key"
               class="text-[#3B4A6B] hover:bg-[#F7F9FD] cursor-pointer transition-colors"
               @click="openRow(row)"
             >
@@ -222,7 +222,8 @@
 <script setup lang="ts">
 const search = ref('')
 const statusFilter = ref('')
-const violations = ref<any[]>([])
+const tickets = ref<any[]>([])
+const declined = ref<any[]>([])
 const loading = ref(true)
 const selected = ref<any | null>(null)
 const zoom = ref<string | null>(null)
@@ -232,20 +233,71 @@ const imagesLoading = ref(false)
 const page = ref(1)
 const pageSize = ref(10)
 
+function formatDate(value: any) {
+  if (!value) return 'N/A'
+  const d = new Date(value)
+  if (isNaN(d.getTime())) return String(value)
+  return d.toLocaleString('en-US', {
+    month: 'short', day: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+  })
+}
+
 onMounted(async () => {
-  try {
-    violations.value = await $fetch<any[]>('/api/violations')
-  } catch (error) {
-    console.error(error)
+  const [ticketsRes, declinedRes] = await Promise.allSettled([
+    $fetch<any[]>('/api/violations'),
+    $fetch<any[]>('/api/detections'),
+  ])
+
+  if (ticketsRes.status === 'fulfilled') {
+    tickets.value = ticketsRes.value
+  } else {
+    console.error(ticketsRes.reason)
   }
+
+  if (declinedRes.status === 'fulfilled') {
+    // declined detections shaped like ticket rows
+    declined.value = declinedRes.value.map((d: any) => ({
+      key: `d-${d.id}`,
+      id: d.id,
+      plate_number: d.plate_number ?? '',
+      violation: d.decline_reason || 'Declined detection',
+      location: d.location,
+      officers: d.declined_by
+        ? { name: d.declined_by, officer_code: d.declined_by_badge }
+        : null,
+      is_detection: true,
+      datetime: formatDate(d.declined_at ?? d.detected_at),
+      status: 'Declined',
+      decline_notes: d.decline_notes ?? '',
+      images: [],
+      videos: [],
+      sort_time: new Date(d.declined_at ?? d.detected_at).getTime() || 0,
+    }))
+  } else {
+    console.error(declinedRes.reason)
+  }
+
   loading.value = false
 })
+
+// tickets + declined detections in one list, newest first
+const violations = computed(() =>
+  [
+    ...tickets.value.map((t) => ({
+      ...t,
+      key: `t-${t.id}`,
+      sort_time: new Date(t.datetime).getTime() || 0,
+    })),
+    ...declined.value,
+  ].sort((a, b) => b.sort_time - a.sort_time)
+)
 
 const filtered = computed(() =>
   violations.value.filter((v) => {
     const s = search.value.toLowerCase()
     const matchSearch =
-      v.plate_number.toLowerCase().includes(s) ||
+      (v.plate_number ?? '').toLowerCase().includes(s) ||
       (v.location ?? '').toLowerCase().includes(s)
     const matchStatus = !statusFilter.value || v.status === statusFilter.value
     return matchSearch && matchStatus
@@ -293,20 +345,48 @@ watch(totalPages, (t) => {
 })
 
 // Fields not shown in the details grid
-const HIDDEN_KEYS = ['id', 'officers', 'officer_id', 'images', 'videos', 'evidence']
+const HIDDEN_KEYS = ['id', 'key', 'sort_time', 'officers', 'officer_id', 'images', 'videos', 'evidence', 'is_detection', 'declined_by', 'declined_by_badge']
+
+// Payment fields: only shown on tickets that are Paid
+const PAYMENT_KEYS = ['date_paid', 'receipt_number', 'owner_name', 'amount_paid', 'payment_method', 'remarks']
+
+const LABELS: Record<string, string> = {
+  date_paid: 'Date paid',
+  receipt_number: 'Receipt no.',
+  owner_name: 'Paid by',
+  amount_paid: 'Amount paid',
+  payment_method: 'Payment method',
+  remarks: 'Remarks',
+}
 
 const images = computed<string[]>(() => selected.value?.images ?? [])
 const videos = computed<string[]>(() => selected.value?.videos ?? [])
 
-// If the list didn't include media, try the full ticket record
+// If the list didn't include media, try the full record
 async function openRow(row: any) {
   selected.value = row
+
+  if (row.is_detection) {
+    if (row.images?.length) return
+    imagesLoading.value = true
+    try {
+      const full = await $fetch<any>(`/api/detections/${row.id}`)
+      if (selected.value?.key === row.key) {
+        selected.value = { ...row, images: full.images ?? [] }
+      }
+    } catch (error) {
+      console.error(error)
+    }
+    imagesLoading.value = false
+    return
+  }
+
   if (row.images?.length || row.videos?.length || !row.transaction_code) return
 
   imagesLoading.value = true
   try {
     const full = await $fetch<any>(`/api/settlement/${encodeURIComponent(row.transaction_code)}`)
-    if (selected.value?.id === row.id) {
+    if (selected.value?.key === row.key) {
       selected.value = { ...row, images: full.images ?? [], videos: full.videos ?? [] }
     }
   } catch (error) {
@@ -318,10 +398,17 @@ async function openRow(row: any) {
 const details = computed(() => {
   if (!selected.value) return []
   const row = selected.value
+  const isPaid = row.status === 'Paid'
   const list = [{ label: 'Officer', value: row.officers?.officer_code ?? 'N/A' }]
   for (const [key, val] of Object.entries(row)) {
     if (HIDDEN_KEYS.includes(key)) continue
-    list.push({ label: formatLabel(key), value: formatValue(key, val) })
+
+    if (PAYMENT_KEYS.includes(key)) {
+      if (!isPaid) continue                    // unpaid / declined: no payment details
+      if (key === 'remarks' && !val) continue  // skip empty remarks
+    }
+
+    list.push({ label: LABELS[key] ?? formatLabel(key), value: formatValue(key, val) })
   }
   return list
 })
@@ -333,6 +420,9 @@ function formatLabel(key: string) {
 
 function formatValue(key: string, val: any) {
   if (val === null || val === undefined || val === '') return 'N/A'
+  if (key === 'amount_paid' && !isNaN(Number(val))) {
+    return `₱${Number(val).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  }
   if (typeof val === 'boolean') return val ? 'Yes' : 'No'
   if (typeof val === 'object') return JSON.stringify(val)
   return String(val)

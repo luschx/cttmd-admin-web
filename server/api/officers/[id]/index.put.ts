@@ -1,6 +1,6 @@
 export default defineEventHandler(async (event) => {
   const id = Number(getRouterParam(event, 'id'))
-  const { name, badge_id, password, is_active } = await readBody(event)
+  const { name, badge_id, password, is_active, zone, phone_number } = await readBody(event)
 
   if (!Number.isInteger(id)) {
     throw createError({ statusCode: 400, statusMessage: 'Invalid enforcer id.' })
@@ -16,8 +16,10 @@ export default defineEventHandler(async (event) => {
     full_name: name.trim(),
     badge_id: badge_id.trim(),
     is_on_duty: is_active ?? true,
+    assigned_area: zone ?? '',
   }
   if (password) body.password = password
+  if (phone_number !== undefined) body.contact_number = String(phone_number).trim()
 
   const updated = await djangoFetch(event, `/api/enforcers/${id}/`, {
     method: 'PATCH',

@@ -60,11 +60,46 @@
         <p class="text-xs text-[#6B7A99]">Access is restricted to authorized CTTMD office administrators only.</p>
       </div>
     </div>
+
+    <!-- Loading screen (shown after a successful login, before the dashboard opens) -->
+    <Transition
+      enter-active-class="transition-opacity duration-300"
+      enter-from-class="opacity-0"
+      enter-to-class="opacity-100"
+    >
+      <div
+        v-if="showSplash"
+        class="fixed inset-0 z-50 flex flex-col items-center justify-center bg-gradient-to-br from-[#0B1A3B] via-[#1B3262] to-[#2952D9] px-6"
+      >
+        <!-- Logo with a spinning ring -->
+        <div class="relative w-40 h-40 flex items-center justify-center mb-8">
+          <span class="absolute inset-0 rounded-full border-4 border-white/15"></span>
+          <span class="absolute inset-0 rounded-full border-4 border-transparent border-t-white animate-spin"></span>
+          <span class="absolute inset-3 rounded-full bg-white/10 animate-pulse"></span>
+          <img src="/logos/CTTMD_Logo.png" alt="CTTMD logo" class="relative w-24 h-24 object-contain" />
+        </div>
+
+        <h2 class="text-2xl font-bold text-white mb-1">Welcome back</h2>
+        <p class="text-sm text-white/70 mb-8 h-5">{{ splashMessage }}</p>
+
+        <!-- Progress bar -->
+        <div class="w-64 h-2 rounded-full bg-white/15 overflow-hidden">
+          <div
+            class="h-full rounded-full bg-white transition-[width] duration-100 ease-linear"
+            :style="{ width: progress + '%' }"
+          ></div>
+        </div>
+        <p class="mt-3 text-xs text-white/50">{{ Math.round(progress) }}%</p>
+      </div>
+    </Transition>
   </div>
 </template>
 
 <script setup lang="ts">
 definePageMeta({ layout: false })
+
+// How long the loading screen stays visible (milliseconds). Change this to adjust.
+const SPLASH_MS = 3000
 
 const username = ref('')
 const password = ref('')
@@ -72,18 +107,51 @@ const showPassword = ref(false)
 const errorMsg = ref('')
 const loading = ref(false)
 
+const showSplash = ref(false)
+const progress = ref(0)
+let timer: ReturnType<typeof setInterval> | undefined
+
+const splashMessage = computed(() => {
+  if (progress.value < 35) return 'Verifying your account...'
+  if (progress.value < 70) return 'Loading your data...'
+  return 'Preparing your dashboard...'
+})
+
 const { login } = useAuth()
 
+function runSplash(): Promise<void> {
+  showSplash.value = true
+  progress.value = 0
+  const start = Date.now()
+
+  return new Promise((resolve) => {
+    timer = setInterval(() => {
+      const elapsed = Date.now() - start
+      progress.value = Math.min(100, (elapsed / SPLASH_MS) * 100)
+      if (elapsed >= SPLASH_MS) {
+        if (timer) clearInterval(timer)
+        resolve()
+      }
+    }, 50)
+  })
+}
+
 async function handleLogin() {
+  if (loading.value) return
   errorMsg.value = ''
   loading.value = true
   try {
     await login(username.value, password.value)
+    await runSplash()
     await navigateTo('/dashboard')
   } catch (e: any) {
+    showSplash.value = false
     errorMsg.value = e?.data?.statusMessage || 'Sayop ang username o password'
-  } finally {
     loading.value = false
   }
 }
+
+onBeforeUnmount(() => {
+  if (timer) clearInterval(timer)
+})
 </script>

@@ -1,6 +1,3 @@
-// Change this to the picture field name your Django enforcer model/serializer uses
-const DJANGO_PHOTO_FIELD = 'profile_picture'
-
 export default defineEventHandler(async (event) => {
   const id = Number(getRouterParam(event, 'id'))
   if (!Number.isInteger(id)) {
@@ -22,13 +19,13 @@ export default defineEventHandler(async (event) => {
 
   const fd = new FormData()
   fd.append(
-    DJANGO_PHOTO_FIELD,
+    'photo',
     new Blob([file.data as unknown as BlobPart], { type: file.type }),
     file.filename
   )
 
-  const updated = await djangoFetch(event, `/api/enforcers/${id}/`, {
-    method: 'PATCH',
+  const updated = await djangoFetch(event, `/api/admin/enforcers/${id}/photo/`, {
+    method: 'POST',
     body: fd,
   })
   return mapEnforcer(updated)

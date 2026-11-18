@@ -8,13 +8,47 @@
         </div>
       </div>
       <div class="flex items-center gap-3">
-        <button @click="openAreas" class="bg-white text-[#2952D9] hover:bg-[#F0F4FB] px-5 py-3 rounded-xl text-sm font-semibold flex items-center gap-2 shadow-[0_4px_16px_rgba(15,31,77,0.06)] transition-colors">
-          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.243-4.243a8 8 0 1111.314 0z" />
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-          </svg>
-          View by area
-        </button>
+        <!-- View by area dropdown -->
+        <div class="relative">
+          <div v-if="areaOpen" class="fixed inset-0 z-10" @click="areaOpen = false"></div>
+          <button
+            type="button"
+            @click="areaOpen = !areaOpen"
+            class="relative z-20 bg-white text-[#2952D9] hover:bg-[#F0F4FB] px-5 py-3 rounded-xl text-sm font-semibold flex items-center gap-2 shadow-[0_4px_16px_rgba(15,31,77,0.06)] transition-colors max-w-[260px]"
+          >
+            <span class="truncate">{{ areaSelected ? areaSelected.replace(', Butuan City', '') : 'View by area' }}</span>
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0 transition-transform" :class="areaOpen ? 'rotate-180' : ''" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M5 8l5 5 5-5" />
+            </svg>
+          </button>
+
+          <div
+            v-if="areaOpen"
+            class="absolute z-20 right-0 mt-2 w-72 max-h-80 overflow-y-auto bg-white rounded-2xl shadow-[0_8px_24px_rgba(15,31,77,0.18)] border border-[#E8EDF7]"
+          >
+            <button
+              type="button"
+              class="w-full text-left px-4 py-2.5 text-sm text-[#6B7A99] hover:bg-[#EAF0FF] transition-colors"
+              @click="clearArea"
+            >
+              All enforcers
+            </button>
+            <div v-for="g in areaGroups" :key="g.group">
+              <div class="px-4 py-2 text-xs font-semibold uppercase tracking-wider text-[#6B7A99] bg-[#F7F9FD] sticky top-0">{{ g.group }}</div>
+              <button
+                v-for="a in g.items"
+                :key="a.label"
+                type="button"
+                class="w-full flex items-center justify-between gap-2 text-left px-4 py-2.5 text-sm text-[#0F1F4D] hover:bg-[#EAF0FF] transition-colors"
+                :class="areaSelected === a.label ? 'bg-[#EAF0FF] font-semibold text-[#2952D9]' : ''"
+                @click="pickArea(a.label)"
+              >
+                <span class="truncate">{{ a.name }}</span>
+                <span class="text-xs rounded-lg px-2 py-0.5 shrink-0" :class="a.count ? 'bg-[#2952D9] text-white' : 'bg-[#F0F4FB] text-[#9AA6C0]'">{{ a.count }}</span>
+              </button>
+            </div>
+          </div>
+        </div>
         <button @click="openModal" class="bg-gradient-to-r from-[#1B3262] to-[#2952D9] hover:opacity-90 text-white px-5 py-3 rounded-xl text-sm font-semibold flex items-center gap-2 shadow-[0_4px_16px_rgba(41,82,217,0.35)] transition">
           <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
@@ -28,9 +62,10 @@
       <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#2952D9]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11A6 6 0 115 11a6 6 0 0112 0z" />
       </svg>
-      <input v-model="search" type="text" placeholder="Search enforcers by name, badge or zone..." class="w-full bg-white text-[#0F1F4D] placeholder-[#9AA6C0] rounded-xl pl-10 pr-4 py-3 text-sm shadow-[0_4px_16px_rgba(15,31,77,0.06)] focus:outline-none focus:ring-2 focus:ring-[#2952D9]" />
+      <input v-model="search" type="text" placeholder="Search enforcers by name, badge or phone..." class="w-full bg-white text-[#0F1F4D] placeholder-[#9AA6C0] rounded-xl pl-10 pr-4 py-3 text-sm shadow-[0_4px_16px_rgba(15,31,77,0.06)] focus:outline-none focus:ring-2 focus:ring-[#2952D9]" />
     </div>
 
+    <template v-if="!areaSelected">
     <div v-if="loading" class="text-center text-[#9AA6C0] text-sm py-10">Loading...</div>
     <div v-else-if="!filtered.length" class="text-center text-[#9AA6C0] text-sm py-10">No enforcers found</div>
 
@@ -53,6 +88,7 @@
           </div>
 
           <div class="mt-3 text-xs text-[#6B7A99] truncate" :title="officer.zone">{{ officer.zone || '—' }}</div>
+          <div class="mt-1 text-xs text-[#6B7A99] truncate">{{ officer.phone_number || 'No phone number' }}</div>
 
           <div class="mt-2 pt-2 border-t border-[#F0F4FB] flex items-center justify-between">
             <span class="text-[11px] text-[#6B7A99]"><span class="font-semibold text-[#0F1F4D]">{{ officer.violation_count ?? 0 }}</span> violations</span>
@@ -122,6 +158,68 @@
         </div>
       </div>
     </template>
+    </template>
+
+    <!-- Selected area: enforcer count + cards -->
+    <div v-else>
+      <div class="flex items-center justify-between bg-white rounded-2xl shadow-[0_4px_16px_rgba(15,31,77,0.06)] px-6 py-4 mb-4">
+        <div class="min-w-0">
+          <div class="text-xs text-[#6B7A99]">Assigned to</div>
+          <div class="text-sm font-semibold text-[#0F1F4D] truncate">{{ areaSelected }}</div>
+        </div>
+        <div class="flex items-center gap-5 shrink-0">
+          <div class="text-right">
+            <div class="text-3xl font-bold text-[#2952D9] leading-none">{{ areaOfficers.length }}</div>
+            <div class="text-xs text-[#6B7A99] mt-1">
+              {{ areaOfficers.length === 1 ? 'enforcer' : 'enforcers' }} · {{ areaActiveCount }} active
+            </div>
+          </div>
+          <button type="button" class="bg-[#F0F4FB] text-[#3B4A6B] hover:bg-[#E3EAFF] rounded-xl px-4 py-2 text-xs font-semibold transition-colors" @click="clearArea">
+            Show all
+          </button>
+        </div>
+      </div>
+
+      <div v-if="!areaOfficers.length" class="text-center text-[#9AA6C0] text-sm py-10">
+        No enforcer is assigned to this area yet
+      </div>
+      <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+        <div v-for="o in areaOfficers" :key="o.id" class="bg-white rounded-xl shadow-[0_4px_16px_rgba(15,31,77,0.06)] p-3.5">
+          <div class="flex items-center gap-2.5">
+            <div class="w-10 h-10 rounded-full bg-[#EAF0FF] flex items-center justify-center shrink-0 overflow-hidden">
+              <img v-if="o.photo_url" :src="o.photo_url" :alt="o.name" class="w-full h-full object-cover" />
+              <svg v-else xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-[#2952D9]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
+            </div>
+            <div class="min-w-0 flex-1">
+              <div class="text-sm font-semibold text-[#0F1F4D] truncate">{{ o.name }}</div>
+              <div class="text-[11px] text-[#6B7A99]">{{ o.officer_code }}</div>
+            </div>
+            <span :class="o.status === 'Active' ? 'bg-[#1F9D55]' : 'bg-[#9AA6C0]'" class="w-2.5 h-2.5 rounded-full shrink-0" :title="o.status"></span>
+          </div>
+
+          <div class="mt-3 text-xs text-[#6B7A99] truncate" :title="o.zone">{{ o.zone || '—' }}</div>
+          <div class="mt-1 text-xs text-[#6B7A99] truncate">{{ o.phone_number || 'No phone number' }}</div>
+
+          <div class="mt-2 pt-2 border-t border-[#F0F4FB] flex items-center justify-between">
+            <span class="text-[11px] text-[#6B7A99]"><span class="font-semibold text-[#0F1F4D]">{{ o.violation_count ?? 0 }}</span> violations</span>
+            <div class="flex items-center">
+              <button @click="openEdit(o)" title="Edit enforcer" class="p-1 rounded-md text-[#6B7A99] hover:text-[#2952D9] hover:bg-[#EAF0FF] transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+              </button>
+              <button @click="askDelete(o)" title="Delete enforcer" class="p-1 rounded-md text-[#6B7A99] hover:text-[#E5484D] hover:bg-[#FDECEC] transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <!-- Add / Edit modal -->
     <Teleport to="body">
@@ -171,6 +269,7 @@
 
               <p class="text-xs text-[#6B7A99]">
                 Profile photo · optional
+                <button v-if="photoFile && cropSrc" type="button" class="ml-1 font-semibold text-[#2952D9] hover:underline" @click="cropOpen = true">Adjust</button>
                 <button v-if="photoPreview" type="button" class="ml-1 font-semibold text-[#E5484D] hover:underline" @click="resetPhoto()">Remove</button>
               </p>
             </div>
@@ -183,6 +282,21 @@
             <div>
               <label class="block text-sm font-semibold text-[#0F1F4D] mb-1">Badge ID</label>
               <input v-model="form.badge_id" type="text" required placeholder="e.g. B-001" class="w-full bg-[#F0F4FB] text-[#0F1F4D] placeholder-[#9AA6C0] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#2952D9]" />
+            </div>
+
+            <div>
+              <label class="block text-sm font-semibold text-[#0F1F4D] mb-1">Phone number</label>
+              <input
+                v-model="form.phone_number"
+                type="tel"
+                inputmode="tel"
+                required
+                maxlength="13"
+                pattern="^(09|\+639)\d{9}$"
+                title="Use 09XXXXXXXXX or +639XXXXXXXXX"
+                placeholder="e.g. 09123456789"
+                class="w-full bg-[#F0F4FB] text-[#0F1F4D] placeholder-[#9AA6C0] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#2952D9]"
+              />
             </div>
 
             <div>
@@ -253,102 +367,6 @@
         </div>
       </div>
 
-      <!-- View by area modal -->
-      <div
-        v-if="showAreaModal"
-        class="fixed inset-0 bg-[#0B1A3B]/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-        @click.self="showAreaModal = false"
-      >
-        <div class="bg-white rounded-3xl shadow-[0_8px_32px_rgba(11,26,59,0.35)] w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col">
-          <div class="bg-gradient-to-br from-[#0B1A3B] via-[#1B3262] to-[#2952D9] text-white px-6 py-5 flex items-center justify-between">
-            <div>
-              <h2 class="text-xl font-bold">Enforcers by area</h2>
-              <p class="text-sm text-white/60 mt-0.5">See who is assigned to a specific area</p>
-            </div>
-            <button @click="showAreaModal = false" class="text-white/70 hover:text-white text-2xl leading-none">&times;</button>
-          </div>
-
-          <div class="p-6 overflow-y-auto space-y-5">
-            <div>
-              <label class="block text-sm font-semibold text-[#0F1F4D] mb-1">Select area</label>
-              <div class="relative">
-                <select
-                  v-model="areaSelected"
-                  class="appearance-none w-full bg-[#F0F4FB] text-[#0F1F4D] rounded-xl pl-4 pr-10 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#2952D9] cursor-pointer"
-                >
-                  <option value="">Choose an area...</option>
-                  <optgroup v-for="g in areaGroups" :key="g.group" :label="g.group">
-                    <option v-for="a in g.items" :key="a.label" :value="a.label">{{ a.name }} ({{ a.count }})</option>
-                  </optgroup>
-                </select>
-                <svg class="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6B7A99]" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M5 8l5 5 5-5" />
-                </svg>
-              </div>
-            </div>
-
-            <!-- Result for the selected area -->
-            <template v-if="areaSelected">
-              <div class="flex items-center justify-between bg-[#EAF0FF] rounded-2xl px-5 py-4">
-                <div>
-                  <div class="text-xs text-[#6B7A99]">Assigned to</div>
-                  <div class="text-sm font-semibold text-[#0F1F4D]">{{ areaSelected }}</div>
-                </div>
-                <div class="text-right">
-                  <div class="text-3xl font-bold text-[#2952D9] leading-none">{{ areaOfficers.length }}</div>
-                  <div class="text-xs text-[#6B7A99] mt-1">{{ areaActiveCount }} active</div>
-                </div>
-              </div>
-
-              <div v-if="!areaOfficers.length" class="text-center text-sm text-[#9AA6C0] py-6">
-                No enforcer is assigned to this area yet
-              </div>
-              <div v-else class="space-y-3">
-                <div v-for="o in areaOfficers" :key="o.id" class="flex items-center justify-between gap-3 bg-[#F0F4FB] rounded-2xl px-4 py-3">
-                  <div class="flex items-center gap-3 min-w-0">
-                    <div class="w-10 h-10 rounded-full bg-white flex items-center justify-center shrink-0 overflow-hidden">
-                      <img v-if="o.photo_url" :src="o.photo_url" :alt="o.name" class="w-full h-full object-cover" />
-                      <svg v-else xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-[#2952D9]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                      </svg>
-                    </div>
-                    <div class="min-w-0">
-                      <div class="text-sm font-semibold text-[#0F1F4D] truncate">{{ o.name }}</div>
-                      <div class="text-xs text-[#6B7A99]">{{ o.officer_code }} · {{ o.violation_count ?? 0 }} violations</div>
-                    </div>
-                  </div>
-                  <span :class="o.status === 'Active' ? 'bg-[#DCF5E4] text-[#1F9D55]' : 'bg-white text-[#6B7A99]'" class="px-3 py-1 rounded-full text-xs font-semibold shrink-0">
-                    {{ o.status }}
-                  </span>
-                </div>
-              </div>
-            </template>
-
-            <!-- Nothing selected: quick overview of staffed areas -->
-            <template v-else>
-              <div v-if="!assignedAreas.length" class="text-center text-sm text-[#9AA6C0] py-6">
-                No enforcers have been assigned to an area yet
-              </div>
-              <div v-else>
-                <div class="text-xs font-semibold uppercase tracking-wider text-[#6B7A99] mb-3">Areas with enforcers</div>
-                <div class="flex flex-wrap gap-2">
-                  <button
-                    v-for="a in assignedAreas"
-                    :key="a.label"
-                    type="button"
-                    class="flex items-center gap-2 bg-[#F0F4FB] hover:bg-[#E0E8F8] text-[#0F1F4D] rounded-xl pl-3 pr-2 py-1.5 text-xs font-medium transition-colors"
-                    @click="areaSelected = a.label"
-                  >
-                    {{ a.name }}
-                    <span class="bg-[#2952D9] text-white rounded-lg px-2 py-0.5 text-[10px] font-semibold">{{ a.count }}</span>
-                  </button>
-                </div>
-              </div>
-            </template>
-          </div>
-        </div>
-      </div>
-
       <!-- Delete modal -->
       <div
         v-if="deleteTarget"
@@ -375,6 +393,59 @@
           </div>
         </div>
       </div>
+
+      <!-- Crop photo modal -->
+      <div
+        v-if="cropOpen"
+        class="fixed inset-0 bg-[#0B1A3B]/70 backdrop-blur-sm flex items-center justify-center z-[60] p-4"
+      >
+        <div class="bg-white rounded-3xl shadow-[0_8px_32px_rgba(11,26,59,0.35)] w-full max-w-sm overflow-hidden">
+          <div class="bg-gradient-to-br from-[#0B1A3B] via-[#1B3262] to-[#2952D9] text-white px-6 py-4">
+            <h2 class="text-lg font-bold">Adjust photo</h2>
+            <p class="text-xs text-white/60 mt-0.5">Drag to move, use the slider to zoom</p>
+          </div>
+
+          <div class="p-6 space-y-4">
+            <div
+              class="relative mx-auto bg-[#0B1A3B] overflow-hidden rounded-2xl select-none touch-none cursor-grab active:cursor-grabbing"
+              :style="{ width: CROP_VIEW + 'px', height: CROP_VIEW + 'px' }"
+              @pointerdown="cropDown"
+              @pointermove="cropMove"
+              @pointerup="cropUp"
+              @pointercancel="cropUp"
+            >
+              <img
+                v-if="cropImg"
+                :src="cropSrc"
+                draggable="false"
+                class="absolute max-w-none pointer-events-none"
+                :style="cropImgStyle"
+              />
+              <!-- circle guide -->
+              <div class="absolute inset-0 pointer-events-none rounded-full ring-[999px] ring-[#0B1A3B]/55 border-2 border-white/80"></div>
+            </div>
+
+            <input
+              v-model.number="cropZoom"
+              type="range"
+              min="1"
+              max="4"
+              step="0.01"
+              class="w-full accent-[#2952D9]"
+              @input="clampCrop"
+            />
+
+            <div class="flex justify-end gap-3 pt-1">
+              <button type="button" @click="cancelCrop" class="bg-[#F0F4FB] text-[#3B4A6B] rounded-xl px-5 py-3 text-sm font-semibold hover:bg-[#E3EAFF] transition-colors">
+                Cancel
+              </button>
+              <button type="button" @click="applyCrop" class="bg-gradient-to-r from-[#1B3262] to-[#2952D9] text-white rounded-xl px-5 py-3 text-sm font-semibold shadow-[0_4px_16px_rgba(41,82,217,0.35)] hover:opacity-90 transition">
+                Apply
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
     </Teleport>
   </div>
 </template>
@@ -395,6 +466,7 @@ const editingId = ref<number | null>(null)
 const form = reactive({
   name: '',
   badge_id: '',
+  phone_number: '',
   password: '',
   zone: '',
   is_active: true,
@@ -409,21 +481,152 @@ const photoFile = ref<File | null>(null)
 const photoPreview = ref('')
 const photoInput = ref<HTMLInputElement | null>(null)
 
+// ---- Crop ----
+const CROP_VIEW = 280
+const OUTPUT_SIZE = 400
+
+const cropOpen = ref(false)
+const cropSrc = ref('')
+const cropImg = ref<HTMLImageElement | null>(null)
+const cropZoom = ref(1)
+const cropX = ref(0)
+const cropY = ref(0)
+let dragging = false
+let lastX = 0
+let lastY = 0
+
+// zoom 1 = image just covers the square
+const cropScale = computed(() => {
+  const img = cropImg.value
+  if (!img) return 1
+  return (CROP_VIEW / Math.min(img.naturalWidth, img.naturalHeight)) * cropZoom.value
+})
+
+const cropImgStyle = computed(() => {
+  const img = cropImg.value
+  if (!img) return {}
+  const w = img.naturalWidth * cropScale.value
+  const h = img.naturalHeight * cropScale.value
+  return {
+    width: `${w}px`,
+    height: `${h}px`,
+    left: `${CROP_VIEW / 2 - w / 2 + cropX.value}px`,
+    top: `${CROP_VIEW / 2 - h / 2 + cropY.value}px`,
+  }
+})
+
+function clampCrop() {
+  const img = cropImg.value
+  if (!img) return
+  const maxX = Math.max(0, (img.naturalWidth * cropScale.value - CROP_VIEW) / 2)
+  const maxY = Math.max(0, (img.naturalHeight * cropScale.value - CROP_VIEW) / 2)
+  cropX.value = Math.min(maxX, Math.max(-maxX, cropX.value))
+  cropY.value = Math.min(maxY, Math.max(-maxY, cropY.value))
+}
+
+function cropDown(e: PointerEvent) {
+  dragging = true
+  lastX = e.clientX
+  lastY = e.clientY
+  ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+}
+
+function cropMove(e: PointerEvent) {
+  if (!dragging) return
+  cropX.value += e.clientX - lastX
+  cropY.value += e.clientY - lastY
+  lastX = e.clientX
+  lastY = e.clientY
+  clampCrop()
+}
+
+function cropUp() {
+  dragging = false
+}
+
 function onPhotoPick(e: Event) {
-  const file = (e.target as HTMLInputElement).files?.[0]
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
   if (!file) return
   if (file.size > 5 * 1024 * 1024) {
     formError.value = 'Image must be under 5 MB.'
+    input.value = ''
     return
   }
   formError.value = ''
-  photoFile.value = file
-  photoPreview.value = URL.createObjectURL(file)
+
+  const url = URL.createObjectURL(file)
+  const img = new Image()
+  img.onload = () => {
+    if (cropSrc.value) URL.revokeObjectURL(cropSrc.value)
+    cropSrc.value = url
+    cropImg.value = img
+    cropZoom.value = 1
+    cropX.value = 0
+    cropY.value = 0
+    cropOpen.value = true
+  }
+  img.onerror = () => {
+    formError.value = 'Could not read that image.'
+    URL.revokeObjectURL(url)
+  }
+  img.src = url
+  input.value = '' // allow picking the same file again
+}
+
+function cancelCrop() {
+  cropOpen.value = false
+  // first-time pick cancelled: drop the loaded image
+  if (!photoFile.value) {
+    if (cropSrc.value) URL.revokeObjectURL(cropSrc.value)
+    cropSrc.value = ''
+    cropImg.value = null
+  }
+}
+
+function applyCrop() {
+  const img = cropImg.value
+  if (!img) return
+  const k = OUTPUT_SIZE / CROP_VIEW
+  const w = img.naturalWidth * cropScale.value
+  const h = img.naturalHeight * cropScale.value
+
+  const canvas = document.createElement('canvas')
+  canvas.width = OUTPUT_SIZE
+  canvas.height = OUTPUT_SIZE
+  const ctx = canvas.getContext('2d')!
+  ctx.fillStyle = '#fff'
+  ctx.fillRect(0, 0, OUTPUT_SIZE, OUTPUT_SIZE)
+  ctx.drawImage(
+    img,
+    (CROP_VIEW / 2 - w / 2 + cropX.value) * k,
+    (CROP_VIEW / 2 - h / 2 + cropY.value) * k,
+    w * k,
+    h * k
+  )
+
+  canvas.toBlob(
+    (blob) => {
+      if (!blob) {
+        formError.value = 'Could not process the image.'
+        return
+      }
+      photoFile.value = new File([blob], 'photo.jpg', { type: 'image/jpeg' })
+      photoPreview.value = URL.createObjectURL(blob)
+      cropOpen.value = false
+    },
+    'image/jpeg',
+    0.9
+  )
 }
 
 function resetPhoto(existingUrl = '') {
   photoFile.value = null
   photoPreview.value = existingUrl
+  if (cropSrc.value) URL.revokeObjectURL(cropSrc.value)
+  cropSrc.value = ''
+  cropImg.value = null
+  cropOpen.value = false
   if (photoInput.value) photoInput.value.value = ''
 }
 
@@ -502,6 +705,7 @@ function openModal() {
   editingId.value = null
   form.name = ''
   form.badge_id = ''
+  form.phone_number = ''
   form.password = ''
   form.is_active = true
   clearZone()
@@ -514,6 +718,7 @@ function openEdit(officer: any) {
   editingId.value = officer.id
   form.name = officer.name
   form.badge_id = officer.officer_code
+  form.phone_number = officer.phone_number ?? ''
   form.password = ''
   form.is_active = officer.status === 'Active'
   const z = officer.zone && officer.zone !== '—' ? officer.zone : ''
@@ -536,16 +741,16 @@ async function saveOfficer() {
   try {
     let saved: any
     if (editingId.value) {
-      saved = await $fetch(`/api/officers/${editingId.value}`, { method: 'PUT', body: { ...form } })
+      saved = await $fetch(`/api/officers/${editingId.value}`, { method: 'PUT' as any, body: { ...form } })
     } else {
-      saved = await $fetch('/api/officers', { method: 'POST', body: { ...form } })
+      saved = await $fetch('/api/officers', { method: 'POST' as any, body: { ...form } })
     }
 
     if (photoFile.value) {
       try {
         const fd = new FormData()
         fd.append('photo', photoFile.value)
-        await $fetch(`/api/officers/${saved.id}/photo`, { method: 'POST', body: fd })
+        await $fetch(`/api/officers/${saved.id}/photo`, { method: 'POST' as any, body: fd })
       } catch (error: any) {
         // The enforcer itself was saved; only the picture failed
         await loadOfficers()
@@ -578,7 +783,7 @@ async function removeOfficer() {
   deleting.value = true
   deleteError.value = ''
   try {
-    await $fetch(`/api/officers/${deleteTarget.value.id}`, { method: 'DELETE' })
+    await $fetch(`/api/officers/${deleteTarget.value.id}`, { method: 'DELETE' as any })
     closeDelete()
     await loadOfficers()
   } catch (error: any) {
@@ -594,7 +799,7 @@ const filtered = computed(() => {
     (o) =>
       o.name.toLowerCase().includes(s) ||
       o.officer_code.toLowerCase().includes(s) ||
-      (o.zone ?? '').toLowerCase().includes(s)
+      (o.phone_number ?? '').includes(s)
   )
 })
 
@@ -639,7 +844,7 @@ watch(totalPages, (t) => {
 })
 
 // ---- View by area ----
-const showAreaModal = ref(false)
+const areaOpen = ref(false)
 const areaSelected = ref('')
 
 // zone label -> officers assigned there
@@ -675,19 +880,16 @@ const areaGroups = computed(() => {
   return groups
 })
 
-// Quick overview chips: areas that have at least one enforcer, busiest first
-const assignedAreas = computed(() =>
-  areaGroups.value
-    .flatMap((g) => g.items)
-    .filter((a) => a.count > 0)
-    .sort((a, b) => b.count - a.count)
-)
-
 const areaOfficers = computed(() => officersByZone.value.get(areaSelected.value) ?? [])
 const areaActiveCount = computed(() => areaOfficers.value.filter((o) => o.status === 'Active').length)
 
-function openAreas() {
+function pickArea(label: string) {
+  areaSelected.value = label
+  areaOpen.value = false
+}
+
+function clearArea() {
   areaSelected.value = ''
-  showAreaModal.value = true
+  areaOpen.value = false
 }
 </script>

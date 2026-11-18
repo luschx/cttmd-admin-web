@@ -1,5 +1,5 @@
 export default defineEventHandler(async (event) => {
-  const { name, badge_id, password } = await readBody(event)
+  const { name, badge_id, password, zone, phone_number } = await readBody(event)
 
   if (!name?.trim() || !badge_id?.trim() || !password) {
     throw createError({
@@ -14,7 +14,8 @@ export default defineEventHandler(async (event) => {
       badge_id: badge_id.trim(),
       full_name: name.trim(),
       password,
-      contact_number: '',
+      contact_number: String(phone_number ?? '').trim(),
+      assigned_area: zone ?? '',
     },
   })
   return mapEnforcer(created)

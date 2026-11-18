@@ -28,10 +28,11 @@ export async function djangoFetch<T = any>(
   }
 }
 
-// Turns a Django file path (e.g. "/media/x.jpg") into a full URL the browser can load
+// Turns a Django file path (e.g. "/media/x.jpg") into a full URL the browser can load.
+// Full http(s) URLs and data: URLs (photos stored in the database) are left as they are.
 function toAbsoluteUrl(value: any): string | null {
   if (!value || typeof value !== 'string') return null
-  if (/^https?:\/\//i.test(value)) return value
+  if (/^(https?:|data:)/i.test(value)) return value
   const base = String(useRuntimeConfig().djangoBaseUrl || '').replace(/\/$/, '')
   return `${base}${value.startsWith('/') ? '' : '/'}${value}`
 }
@@ -41,11 +42,19 @@ export function mapEnforcer(e: any) {
     id: e.id,
     name: e.full_name ?? e.name ?? '',
     officer_code: e.badge_id ?? '',
+    phone_number: e.contact_number ?? '',
     status: (e.is_on_duty ?? true) ? 'Active' : 'Inactive',
-    zone: e.zone ?? '—',
+    zone: e.assigned_area ?? e.zone ?? '—',
     violation_count: e.violation_count ?? 0,
     photo_url: toAbsoluteUrl(
-      e.profile_picture ?? e.profile_photo ?? e.photo ?? e.photo_url ?? e.avatar ?? null
+      e.photo_data_url ??
+        e.profile_photo_url ??
+        e.profile_picture ??
+        e.profile_photo ??
+        e.photo ??
+        e.photo_url ??
+        e.avatar ??
+        null
     ),
   }
 }

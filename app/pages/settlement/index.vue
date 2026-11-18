@@ -63,7 +63,7 @@
               <th class="px-6 py-4 font-medium">Plate</th>
               <th class="px-6 py-4 font-medium">Violation</th>
               <th class="px-6 py-4 font-medium">Location</th>
-              <th class="px-6 py-4 font-medium">Date</th>
+              <th class="px-6 py-4 font-medium">{{ showHistory ? 'Date paid' : 'Date' }}</th>
               <th class="px-6 py-4 font-medium">Status</th>
               <th class="px-6 py-4 font-medium text-right">Action</th>
             </tr>
@@ -79,7 +79,7 @@
               <td class="px-6 py-4 font-semibold text-[#0F1F4D]">{{ row.plate_number }}</td>
               <td class="px-6 py-4">{{ row.violation }}</td>
               <td class="px-6 py-4">{{ row.location }}</td>
-              <td class="px-6 py-4">{{ row.datetime }}</td>
+              <td class="px-6 py-4">{{ showHistory ? (row.date_paid ?? row.datetime) : row.datetime }}</td>
               <td class="px-6 py-4">
                 <span
                   class="px-3 py-1 rounded-full text-xs font-semibold"
@@ -197,6 +197,10 @@
                     <div class="flex justify-between gap-4"><span class="text-[#6B7A99]">Location</span><span class="font-semibold text-[#0F1F4D] text-right">{{ record.location }}</span></div>
                     <div class="flex justify-between gap-4"><span class="text-[#6B7A99]">Officer</span><span class="font-semibold text-[#0F1F4D] text-right">{{ record.officer }}</span></div>
                     <div v-if="record.datePaid" class="flex justify-between gap-4"><span class="text-[#6B7A99]">Date Paid</span><span class="font-semibold text-[#0F1F4D] text-right">{{ record.datePaid }}</span></div>
+                    <div v-if="record.receiptNumber" class="flex justify-between gap-4"><span class="text-[#6B7A99]">Receipt No.</span><span class="font-semibold text-[#0F1F4D] text-right">{{ record.receiptNumber }}</span></div>
+                    <div v-if="record.ownerName" class="flex justify-between gap-4"><span class="text-[#6B7A99]">Paid by</span><span class="font-semibold text-[#0F1F4D] text-right">{{ record.ownerName }}</span></div>
+                    <div v-if="record.paymentMethod" class="flex justify-between gap-4"><span class="text-[#6B7A99]">Method</span><span class="font-semibold text-[#0F1F4D] text-right">{{ record.paymentMethod }}</span></div>
+                    <div v-if="record.processedBy" class="flex justify-between gap-4"><span class="text-[#6B7A99]">Processed by</span><span class="font-semibold text-[#0F1F4D] text-right">{{ record.processedBy }}</span></div>
                   </div>
                 </div>
               </div>
@@ -228,28 +232,120 @@
                 </div>
               </div>
 
+              <!-- Payment form (shown after clicking "Mark as paid") -->
+              <div v-if="showPayForm && !record.paid" class="bg-[#F0F4FB] rounded-2xl p-5 space-y-4">
+                <h3 class="text-xs font-semibold text-[#6B7A99] uppercase tracking-wider">Payment details</h3>
+
+                <div class="grid grid-cols-2 gap-4">
+                  <div>
+                    <label class="block text-xs font-medium text-[#6B7A99] mb-1">Receipt number *</label>
+                    <input
+                      v-model.trim="payForm.receiptNumber"
+                      @input="errorMsg = ''"
+                      type="text"
+                      placeholder="As printed on the official receipt"
+                      class="w-full bg-white text-[#0F1F4D] placeholder-[#9AA6C0] rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#2952D9]"
+                    />
+                  </div>
+                  <div>
+                    <label class="block text-xs font-medium text-[#6B7A99] mb-1">Vehicle owner's name *</label>
+                    <input
+                      v-model.trim="payForm.ownerName"
+                      @input="errorMsg = ''"
+                      type="text"
+                      placeholder="Full name"
+                      class="w-full bg-white text-[#0F1F4D] placeholder-[#9AA6C0] rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#2952D9]"
+                    />
+                  </div>
+                  <div>
+                    <label class="block text-xs font-medium text-[#6B7A99] mb-1">Amount paid (₱) *</label>
+                    <input
+                      v-model="payForm.amountPaid"
+                      @input="errorMsg = ''"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      class="w-full bg-white text-[#0F1F4D] rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#2952D9]"
+                    />
+                  </div>
+                  <div>
+                    <label class="block text-xs font-medium text-[#6B7A99] mb-1">Payment method</label>
+                    <select
+                      v-model="payForm.paymentMethod"
+                      class="w-full bg-white text-[#0F1F4D] rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#2952D9]"
+                    >
+                      <option>Cash</option>
+                      <option>GCash</option>
+                      <option>Bank transfer</option>
+                      <option>Other</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label class="block text-xs font-medium text-[#6B7A99] mb-1">Remarks (optional)</label>
+                  <textarea
+                    v-model.trim="payForm.remarks"
+                    rows="2"
+                    class="w-full bg-white text-[#0F1F4D] rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#2952D9]"
+                  ></textarea>
+                </div>
+              </div>
+
               <p v-if="errorMsg" class="text-sm text-[#E5484D] bg-[#FDECEC] rounded-xl px-4 py-2">{{ errorMsg }}</p>
+
+              <div v-if="successMsg" class="flex items-center gap-3 text-sm text-[#1F9D55] bg-[#DCF5E4] rounded-xl px-4 py-3 font-semibold">
+                <svg class="w-5 h-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="9" />
+                  <path d="M8 12.5l2.5 2.5L16 9.5" />
+                </svg>
+                <span>{{ successMsg }}</span>
+              </div>
 
               <div class="flex gap-3">
                 <button
                   class="flex-1 bg-[#F0F4FB] text-[#3B4A6B] font-semibold py-3 rounded-xl hover:bg-[#E3EAFF] transition-colors"
                   :disabled="paying"
-                  @click="closeModal"
+                  @click="showPayForm && !record.paid ? cancelPayment() : closeModal()"
                 >
-                  Close
+                  {{ showPayForm && !record.paid ? 'Back' : 'Close' }}
                 </button>
+
                 <button
-                  v-if="!record.paid"
+                  v-if="!record.paid && !showPayForm"
+                  class="flex-1 bg-gradient-to-r from-[#1F9D55] to-[#34C26B] text-white font-semibold py-3 rounded-xl shadow-[0_4px_16px_rgba(31,157,85,0.35)] hover:opacity-90 transition"
+                  @click="startPayment"
+                >
+                  Mark as paid
+                </button>
+
+                <button
+                  v-if="!record.paid && showPayForm"
                   class="flex-1 bg-gradient-to-r from-[#1F9D55] to-[#34C26B] text-white font-semibold py-3 rounded-xl shadow-[0_4px_16px_rgba(31,157,85,0.35)] hover:opacity-90 disabled:opacity-60 transition"
                   :disabled="paying"
                   @click="markPaid"
                 >
-                  {{ paying ? 'Saving...' : 'Mark as paid' }}
+                  {{ paying ? 'Saving...' : 'Confirm payment' }}
                 </button>
               </div>
             </div>
           </template>
         </div>
+      </div>
+    </Teleport>
+
+    <!-- Success toast -->
+    <Teleport to="body">
+      <div
+        v-if="toastMsg"
+        class="fixed top-6 right-6 z-[60] flex items-center gap-3 bg-white text-[#0F1F4D] rounded-2xl shadow-[0_8px_32px_rgba(11,26,59,0.25)] px-5 py-4 border-l-4 border-[#1F9D55]"
+      >
+        <svg class="w-6 h-6 text-[#1F9D55] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="9" />
+          <path d="M8 12.5l2.5 2.5L16 9.5" />
+        </svg>
+        <span class="text-sm font-semibold">{{ toastMsg }}</span>
+        <button type="button" class="ml-2 text-[#9AA6C0] hover:text-[#0F1F4D] text-xl leading-none" @click="toastMsg = ''">&times;</button>
       </div>
     </Teleport>
   </div>
@@ -270,6 +366,50 @@ const record = ref<any>(null)
 const recordLoading = ref(false)
 const paying = ref(false)
 const errorMsg = ref('')
+const successMsg = ref('')
+const toastMsg = ref('')
+let toastTimer: ReturnType<typeof setTimeout> | undefined
+
+function showToast(message: string) {
+  toastMsg.value = message
+  if (toastTimer) clearTimeout(toastTimer)
+  toastTimer = setTimeout(() => (toastMsg.value = ''), 5000)
+}
+
+onBeforeUnmount(() => {
+  if (toastTimer) clearTimeout(toastTimer)
+})
+
+// Manual payment details
+const showPayForm = ref(false)
+const payForm = reactive({
+  receiptNumber: '',
+  ownerName: '',
+  amountPaid: '' as string | number,
+  paymentMethod: 'Cash',
+  remarks: '',
+})
+
+function resetPayForm() {
+  showPayForm.value = false
+  payForm.receiptNumber = ''
+  payForm.ownerName = ''
+  payForm.amountPaid = ''
+  payForm.paymentMethod = 'Cash'
+  payForm.remarks = ''
+}
+
+function startPayment() {
+  errorMsg.value = ''
+  payForm.amountPaid = record.value?.fine ?? ''
+  showPayForm.value = true
+}
+
+function cancelPayment() {
+  if (paying.value) return
+  errorMsg.value = ''
+  showPayForm.value = false
+}
 
 function toRecord(t: any) {
   return {
@@ -282,8 +422,14 @@ function toRecord(t: any) {
     datetime: t.date_issued,
     location: t.location,
     officer: t.enforcer_badge ? `${t.enforcer_name} - ${t.enforcer_badge}` : 'N/A',
-    paid: t.status === 'paid',
+    paid: String(t.status).toLowerCase() === 'paid',
     datePaid: t.date_paid,
+    receiptNumber: t.receipt_number,
+    ownerName: t.owner_name,
+    paymentMethod: t.payment_method,
+    amountPaid: t.amount_paid,
+    remarks: t.remarks,
+    processedBy: t.processed_by,
     images: t.images ?? [],
     videos: t.videos ?? [],
   }
@@ -304,13 +450,20 @@ onMounted(loadList)
 const filtered = computed(() => {
   const s = search.value.toLowerCase()
   const wanted = showHistory.value ? 'Paid' : 'Unpaid'
-  return allViolations.value.filter(
+  const rows = allViolations.value.filter(
     (v) =>
       v.status === wanted &&
       ((v.plate_number ?? '').toLowerCase().includes(s) ||
         (v.transaction_code ?? '').toLowerCase().includes(s) ||
         (v.location ?? '').toLowerCase().includes(s))
   )
+
+  // History: most recently PAID first (not by the date the ticket was issued)
+  if (showHistory.value) {
+    const paidAt = (v: any) => Date.parse(v.date_paid_iso ?? v.date_paid ?? '') || 0
+    rows.sort((a, b) => paidAt(b) - paidAt(a))
+  }
+  return rows
 })
 
 const totalPages = computed(() => Math.max(1, Math.ceil(filtered.value.length / pageSize.value)))
@@ -357,7 +510,9 @@ const evidenceImages = computed<string[]>(() => record.value?.images ?? [])
 const evidenceVideos = computed<string[]>(() => record.value?.videos ?? [])
 
 async function openRecord(row: any) {
+  resetPayForm()
   errorMsg.value = ''
+  successMsg.value = ''
   record.value = null
   modalOpen.value = true
   recordLoading.value = true
@@ -375,20 +530,50 @@ async function openRecord(row: any) {
 function closeModal() {
   if (paying.value) return
   modalOpen.value = false
+  successMsg.value = ''
+  resetPayForm()
 }
 
 async function markPaid() {
   if (!record.value) return
-  paying.value = true
   errorMsg.value = ''
+
+  // Same cleanup as the server: no spaces, uppercase
+  payForm.receiptNumber = payForm.receiptNumber.replace(/\s+/g, '').toUpperCase()
+  if (!payForm.receiptNumber) return (errorMsg.value = 'Receipt number is required.')
+  if (!/^[A-Z0-9][A-Z0-9\-/]{2,29}$/.test(payForm.receiptNumber)) {
+    return (errorMsg.value = 'Receipt number must be 3-30 characters: letters, numbers, - or / only.')
+  }
+  if (!payForm.ownerName) return (errorMsg.value = "Vehicle owner's name is required.")
+  if (!payForm.amountPaid || Number(payForm.amountPaid) <= 0) {
+    return (errorMsg.value = 'Enter a valid amount paid.')
+  }
+
+  paying.value = true
   try {
     const prev = record.value
-    const data = await $fetch<any>(`/api/tickets/${prev.id}/pay`, { method: 'POST' })
+    const data = await $fetch<any>(`/api/tickets/${prev.id}/pay`, {
+      method: 'POST',
+      body: {
+        receipt_number: payForm.receiptNumber,
+        owner_name: payForm.ownerName,
+        amount_paid: Number(payForm.amountPaid),
+        payment_method: payForm.paymentMethod,
+        remarks: payForm.remarks || null,
+      },
+    })
     record.value = { ...toRecord(data), images: prev.images, videos: prev.videos }
     // Keep the ticket in the list but flip it to Paid so it moves to History
     allViolations.value = allViolations.value.map((v) =>
-      v.id === prev.id ? { ...v, status: 'Paid' } : v
+      v.id === prev.id
+        ? { ...v, status: 'Paid', date_paid: data.date_paid, date_paid_iso: data.date_paid_iso }
+        : v
     )
+    showPayForm.value = false
+
+    const done = `Payment confirmed. Ticket ${prev.txCode} is now marked as paid.`
+    successMsg.value = done
+    showToast(done)
   } catch (error: any) {
     errorMsg.value = error?.data?.statusMessage || error.message
   }
