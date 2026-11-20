@@ -1,3 +1,4 @@
+// server/api/violations.get.ts  (or server/api/violations/index.get.ts, wherever your list route lives)
 export default defineEventHandler(async (event) => {
   const data: any[] = await djangoFetch(event, '/api/admin/tickets/search/')
 
@@ -64,7 +65,10 @@ export default defineEventHandler(async (event) => {
     return { images: [...new Set(images)], videos: [...new Set(videos)] }
   }
 
-  return data.map((t) => {
+  return data.map((raw) => {
+    // Replaces has_signature / signature_url with one violator_signature field
+    const t = withViolatorSignature(raw)
+
     const {
       date_issued, enforcer_name, enforcer_badge,
       evidence, images: _i, image: _im, photo: _p,

@@ -1,3 +1,4 @@
+// server/api/settlement/[code].get.ts
 export default defineEventHandler(async (event) => {
   const code = decodeURIComponent(getRouterParam(event, 'code') || '').trim()
   if (!code) {
@@ -51,5 +52,16 @@ export default defineEventHandler(async (event) => {
   add(t.videos, true)
   add(t.proof_video, true)
 
-  return { ...t, images: [...new Set(images)], videos: [...new Set(videos)] }
+  // Keep data URIs as they are, turn relative file paths into absolute URLs
+  const sig = (raw: any) => {
+    if (!raw || typeof raw !== 'string') return ''
+    return raw.startsWith('data:') ? raw : abs(raw)
+  }
+
+  return {
+    ...withViolatorSignature(t),
+    images: [...new Set(images)],
+    videos: [...new Set(videos)],
+    signature: sig(t.enforcer_signature ?? t.signature),
+  }
 })

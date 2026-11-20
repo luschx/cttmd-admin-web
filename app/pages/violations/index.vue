@@ -47,7 +47,7 @@
               <td class="px-6 py-4 font-semibold text-[#0F1F4D]">{{ row.plate_number }}</td>
               <td class="px-6 py-4">{{ row.violation }}</td>
               <td class="px-6 py-4">{{ row.location }}</td>
-              <td class="px-6 py-4">{{ row.officers?.officer_code ?? 'N/A' }}</td>
+              <td class="px-6 py-4">{{ officerName(row) }}</td>
               <td class="px-6 py-4">{{ row.datetime }}</td>
               <td class="px-6 py-4">
                 <span :class="statusClass(row.status)" class="px-3 py-1 rounded-full text-xs font-semibold">
@@ -203,6 +203,52 @@
                 ></video>
               </div>
             </div>
+
+            <!-- Enforcer signature -->
+            <div>
+              <div class="flex items-center mb-4">
+                <span class="w-1 h-5 rounded-full bg-[#2952D9] mr-3"></span>
+                <h3 class="text-lg font-semibold text-[#0F1F4D]">Enforcer signature</h3>
+              </div>
+              <div class="bg-[#F0F4FB] rounded-2xl p-6 flex flex-col items-center">
+                <img
+                  v-if="signature"
+                  :src="signature"
+                  alt="Enforcer signature"
+                  class="max-h-32 object-contain bg-white rounded-xl px-6 py-3 cursor-zoom-in"
+                  @click="zoom = signature"
+                />
+                <div v-else class="text-sm text-[#9AA6C0]">
+                  {{ imagesLoading ? 'Loading...' : 'No signature uploaded' }}
+                </div>
+                <div class="mt-3 text-xs text-[#6B7A99]">
+                  {{ officerName(selected) }}
+                </div>
+              </div>
+            </div>
+
+            <!-- Violator signature (Paid tickets only, captured on the web settlement page) -->
+            <div v-if="selected.status === 'Paid'">
+              <div class="flex items-center mb-4">
+                <span class="w-1 h-5 rounded-full bg-[#2952D9] mr-3"></span>
+                <h3 class="text-lg font-semibold text-[#0F1F4D]">Violator signature</h3>
+              </div>
+              <div class="bg-[#F0F4FB] rounded-2xl p-6 flex flex-col items-center">
+                <img
+                  v-if="violatorSignature"
+                  :src="violatorSignature"
+                  alt="Violator signature"
+                  class="max-h-32 object-contain bg-white rounded-xl px-6 py-3 cursor-zoom-in"
+                  @click="zoom = violatorSignature"
+                />
+                <div v-else class="text-sm text-[#9AA6C0]">
+                  {{ imagesLoading ? 'Loading...' : 'No signature on file' }}
+                </div>
+                <div class="mt-3 text-xs text-[#6B7A99]">
+                  {{ selected.owner_name ?? 'N/A' }}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -213,7 +259,7 @@
         class="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-6 cursor-zoom-out"
         @click="zoom = null"
       >
-        <img :src="zoom" alt="Proof" class="max-w-full max-h-full rounded-2xl" />
+        <img :src="zoom" alt="Proof" class="max-w-full max-h-full rounded-2xl bg-white" />
       </div>
     </Teleport>
   </div>
@@ -241,6 +287,24 @@ function formatDate(value: any) {
     month: 'short', day: '2-digit', year: 'numeric',
     hour: '2-digit', minute: '2-digit',
   })
+}
+
+// Officer shown by name only (no badge ID)
+function officerName(row: any) {
+  return row?.officers?.name ?? row?.officers?.officer_code ?? 'N/A'
+}
+
+// Reload only the tickets (used on focus so a ticket settled elsewhere shows as Paid)
+async function loadTickets() {
+  try {
+    tickets.value = await $fetch<any[]>('/api/violations')
+  } catch (error) {
+    console.error(error)
+  }
+}
+
+function onWindowFocus() {
+  loadTickets()
 }
 
 onMounted(async () => {
@@ -272,6 +336,7 @@ onMounted(async () => {
       decline_notes: d.decline_notes ?? '',
       images: [],
       videos: [],
+      signature: d.declined_by_signature ?? d.signature ?? '',
       sort_time: new Date(d.declined_at ?? d.detected_at).getTime() || 0,
     }))
   } else {
@@ -279,6 +344,11 @@ onMounted(async () => {
   }
 
   loading.value = false
+  window.addEventListener('focus', onWindowFocus)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('focus', onWindowFocus)
 })
 
 // tickets + declined detections in one list, newest first
@@ -345,7 +415,13 @@ watch(totalPages, (t) => {
 })
 
 // Fields not shown in the details grid
-const HIDDEN_KEYS = ['id', 'key', 'sort_time', 'officers', 'officer_id', 'images', 'videos', 'evidence', 'is_detection', 'declined_by', 'declined_by_badge']
+const HIDDEN_KEYS = [
+  'id', 'key', 'sort_time', 'officers', 'officer_id', 'images', 'videos', 'evidence',
+  'is_detection', 'declined_by', 'declined_by_badge',
+  'signature', 'enforcer_signature', 'declined_by_signature',
+  'violator_signature',
+  'has_signature', 'signature_url', 'has_enforcer_signature',
+]
 
 // Payment fields: only shown on tickets that are Paid
 const PAYMENT_KEYS = ['date_paid', 'receipt_number', 'owner_name', 'amount_paid', 'payment_method', 'remarks']
@@ -362,17 +438,45 @@ const LABELS: Record<string, string> = {
 const images = computed<string[]>(() => selected.value?.images ?? [])
 const videos = computed<string[]>(() => selected.value?.videos ?? [])
 
-// If the list didn't include media, try the full record
+// Signature source: URL, data URI, or raw base64
+function toSrc(raw: string) {
+  if (!raw) return ''
+  if (/^(https?:|data:|\/)/.test(raw)) return raw
+  return `data:image/png;base64,${raw}`
+}
+
+// Enforcer signature from the mobile app
+const signature = computed<string>(() =>
+  toSrc(
+    selected.value?.signature ||
+    selected.value?.enforcer_signature ||
+    selected.value?.officers?.signature ||
+    ''
+  )
+)
+
+// Violator signature, captured on the web settlement page
+const violatorSignature = computed<string>(() => toSrc(selected.value?.violator_signature ?? ''))
+
+// Open a row. For tickets, always load the full record: it carries the media and
+// both signatures already embedded, so the modal does not depend on extra image routes.
 async function openRow(row: any) {
-  selected.value = row
+  // Tickets start with blank signatures ("Loading...") until the full record arrives
+  selected.value = row.is_detection
+    ? row
+    : { ...row, signature: '', enforcer_signature: '', violator_signature: '' }
 
   if (row.is_detection) {
-    if (row.images?.length) return
+    if (row.images?.length && row.signature) return
     imagesLoading.value = true
     try {
       const full = await $fetch<any>(`/api/detections/${row.id}`)
       if (selected.value?.key === row.key) {
-        selected.value = { ...row, images: full.images ?? [] }
+        selected.value = {
+          ...row,
+          images: full.images ?? row.images ?? [],
+          signature: full.declined_by_signature ?? full.signature ?? row.signature ?? '',
+        }
       }
     } catch (error) {
       console.error(error)
@@ -381,13 +485,19 @@ async function openRow(row: any) {
     return
   }
 
-  if (row.images?.length || row.videos?.length || !row.transaction_code) return
+  if (!row.transaction_code) return
 
   imagesLoading.value = true
   try {
     const full = await $fetch<any>(`/api/settlement/${encodeURIComponent(row.transaction_code)}`)
     if (selected.value?.key === row.key) {
-      selected.value = { ...row, images: full.images ?? [], videos: full.videos ?? [] }
+      selected.value = {
+        ...row,
+        images: full.images ?? row.images ?? [],
+        videos: full.videos ?? row.videos ?? [],
+        signature: full.enforcer_signature || full.signature || '',
+        violator_signature: full.violator_signature || '',
+      }
     }
   } catch (error) {
     console.error(error)
@@ -399,7 +509,7 @@ const details = computed(() => {
   if (!selected.value) return []
   const row = selected.value
   const isPaid = row.status === 'Paid'
-  const list = [{ label: 'Officer', value: row.officers?.officer_code ?? 'N/A' }]
+  const list = [{ label: 'Officer', value: officerName(row) }]
   for (const [key, val] of Object.entries(row)) {
     if (HIDDEN_KEYS.includes(key)) continue
 

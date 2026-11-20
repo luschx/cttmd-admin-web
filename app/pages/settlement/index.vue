@@ -232,6 +232,42 @@
                 </div>
               </div>
 
+              <!-- Enforcer signature (from the mobile app, shown for every ticket) -->
+              <div>
+                <div class="flex items-center mb-4">
+                  <span class="w-1 h-5 rounded-full bg-[#2952D9] mr-3"></span>
+                  <h3 class="text-lg font-semibold text-[#0F1F4D]">Enforcer signature</h3>
+                </div>
+                <div class="bg-[#F0F4FB] rounded-2xl p-6 flex flex-col items-center">
+                  <img
+                    v-if="record.enforcerSignature"
+                    :src="record.enforcerSignature"
+                    alt="Enforcer signature"
+                    class="max-h-32 object-contain bg-white rounded-xl px-6 py-3"
+                  />
+                  <div v-else class="text-sm text-[#9AA6C0]">No signature on file</div>
+                  <div class="mt-3 text-xs text-[#6B7A99]">{{ record.officer ?? 'N/A' }}</div>
+                </div>
+              </div>
+
+              <!-- Violator signature (paid tickets) -->
+              <div v-if="record.paid">
+                <div class="flex items-center mb-4">
+                  <span class="w-1 h-5 rounded-full bg-[#2952D9] mr-3"></span>
+                  <h3 class="text-lg font-semibold text-[#0F1F4D]">Violator signature</h3>
+                </div>
+                <div class="bg-[#F0F4FB] rounded-2xl p-6 flex flex-col items-center">
+                  <img
+                    v-if="violatorSignatureSrc"
+                    :src="violatorSignatureSrc"
+                    alt="Violator signature"
+                    class="max-h-32 object-contain bg-white rounded-xl px-6 py-3"
+                  />
+                  <div v-else class="text-sm text-[#9AA6C0]">No signature on file</div>
+                  <div class="mt-3 text-xs text-[#6B7A99]">{{ record.ownerName ?? 'N/A' }}</div>
+                </div>
+              </div>
+
               <!-- Payment form (shown after clicking "Mark as paid") -->
               <div v-if="showPayForm && !record.paid" class="bg-[#F0F4FB] rounded-2xl p-5 space-y-4">
                 <h3 class="text-xs font-semibold text-[#6B7A99] uppercase tracking-wider">Payment details</h3>
@@ -290,6 +326,11 @@
                     class="w-full bg-white text-[#0F1F4D] rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#2952D9]"
                   ></textarea>
                 </div>
+
+                <div>
+                  <label class="block text-xs font-medium text-[#6B7A99] mb-1">Violator signature *</label>
+                  <SignaturePad v-model="payForm.signature" @update:model-value="errorMsg = ''" />
+                </div>
               </div>
 
               <p v-if="errorMsg" class="text-sm text-[#E5484D] bg-[#FDECEC] rounded-xl px-4 py-2">{{ errorMsg }}</p>
@@ -322,7 +363,7 @@
                 <button
                   v-if="!record.paid && showPayForm"
                   class="flex-1 bg-gradient-to-r from-[#1F9D55] to-[#34C26B] text-white font-semibold py-3 rounded-xl shadow-[0_4px_16px_rgba(31,157,85,0.35)] hover:opacity-90 disabled:opacity-60 transition"
-                  :disabled="paying"
+                  :disabled="paying || !payForm.signature"
                   @click="markPaid"
                 >
                   {{ paying ? 'Saving...' : 'Confirm payment' }}
@@ -388,6 +429,7 @@ const payForm = reactive({
   amountPaid: '' as string | number,
   paymentMethod: 'Cash',
   remarks: '',
+  signature: '', // violator signature (PNG data URL), captured on the web only
 })
 
 function resetPayForm() {
@@ -397,10 +439,12 @@ function resetPayForm() {
   payForm.amountPaid = ''
   payForm.paymentMethod = 'Cash'
   payForm.remarks = ''
+  payForm.signature = ''
 }
 
 function startPayment() {
   errorMsg.value = ''
+  payForm.signature = '' // always start with a blank signature
   payForm.amountPaid = record.value?.fine ?? ''
   showPayForm.value = true
 }
@@ -408,6 +452,7 @@ function startPayment() {
 function cancelPayment() {
   if (paying.value) return
   errorMsg.value = ''
+  payForm.signature = '' // the pad is destroyed on Back, so drop the old drawing too
   showPayForm.value = false
 }
 
@@ -421,7 +466,7 @@ function toRecord(t: any) {
     fine: t.fine_amount,
     datetime: t.date_issued,
     location: t.location,
-    officer: t.enforcer_badge ? `${t.enforcer_name} - ${t.enforcer_badge}` : 'N/A',
+    officer: t.enforcer_name || 'N/A',
     paid: String(t.status).toLowerCase() === 'paid',
     datePaid: t.date_paid,
     receiptNumber: t.receipt_number,
@@ -430,6 +475,12 @@ function toRecord(t: any) {
     amountPaid: t.amount_paid,
     remarks: t.remarks,
     processedBy: t.processed_by,
+    // '' or /api/tickets/<id>/signature. The server routes set violator_signature;
+    // has_signature is the fallback in case an older route is still deployed.
+    violatorSignature:
+      t.violator_signature || (t.has_signature ? `/api/tickets/${t.id}/signature` : ''),
+    // Officer's signature from the mobile app ('' when none was sent)
+    enforcerSignature: t.enforcer_signature || t.signature || '',
     images: t.images ?? [],
     videos: t.videos ?? [],
   }
@@ -509,6 +560,14 @@ watch(totalPages, (t) => {
 const evidenceImages = computed<string[]>(() => record.value?.images ?? [])
 const evidenceVideos = computed<string[]>(() => record.value?.videos ?? [])
 
+// Violator signature: URL, data URI, or raw base64
+const violatorSignatureSrc = computed<string>(() => {
+  const raw: string = record.value?.violatorSignature ?? ''
+  if (!raw) return ''
+  if (/^(https?:|data:|\/)/.test(raw)) return raw
+  return `data:image/png;base64,${raw}`
+})
+
 async function openRecord(row: any) {
   resetPayForm()
   errorMsg.value = ''
@@ -548,10 +607,12 @@ async function markPaid() {
   if (!payForm.amountPaid || Number(payForm.amountPaid) <= 0) {
     return (errorMsg.value = 'Enter a valid amount paid.')
   }
+  if (!payForm.signature) return (errorMsg.value = 'The violator must sign before payment can be confirmed.')
 
   paying.value = true
   try {
     const prev = record.value
+    const signed = payForm.signature
     const data = await $fetch<any>(`/api/tickets/${prev.id}/pay`, {
       method: 'POST',
       body: {
@@ -560,9 +621,18 @@ async function markPaid() {
         amount_paid: Number(payForm.amountPaid),
         payment_method: payForm.paymentMethod,
         remarks: payForm.remarks || null,
+        violator_signature: signed,
       },
     })
-    record.value = { ...toRecord(data), images: prev.images, videos: prev.videos }
+    const updated = toRecord(data)
+    record.value = {
+      ...updated,
+      // Show what was just drawn right away; later opens load it from the server
+      violatorSignature: signed,
+      enforcerSignature: prev.enforcerSignature,
+      images: prev.images,
+      videos: prev.videos,
+    }
     // Keep the ticket in the list but flip it to Paid so it moves to History
     allViolations.value = allViolations.value.map((v) =>
       v.id === prev.id
