@@ -50,10 +50,6 @@
         >
           {{ loading ? 'Logging in...' : 'Log in' }}
         </button>
-
-        <div class="text-center">
-          <a href="#" class="text-[#2952D9] text-sm font-medium hover:underline">Forgot password?</a>
-        </div>
       </div>
 
       <div class="mt-8 pt-6 border-t border-[#E8EDF7] text-center">

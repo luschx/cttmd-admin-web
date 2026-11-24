@@ -109,6 +109,14 @@
 
         <div class="flex items-center gap-3">
           <button
+            type="button"
+            class="text-sm font-medium text-[#2952D9] bg-[#EAF0FF] px-3 py-1 rounded-full hover:bg-[#DCE6FF]"
+            @click="toggleSound"
+          >
+            {{ soundEnabled ? '🔔 Sound on' : '🔕 Sound off' }}
+          </button>
+
+          <button
             v-if="!isToday"
             @click="pickedDate = null"
             class="text-sm font-medium text-[#2952D9] bg-[#EAF0FF] px-3 py-1 rounded-full hover:bg-[#DCE6FF]"
@@ -327,6 +335,63 @@ const statCards = computed(() => [
   { label: 'Ticket settled', value: stats.value.ticketSettled, trend: null as number | null, color: 'text-[#1F9D55]' },
 ])
 
+/* ------------------------------------------------------------------ */
+/* New violation alerts (browser notification + sound)                 */
+/* ------------------------------------------------------------------ */
+const SOUND_KEY = 'cttmd-alert-sound'
+const soundEnabled = ref(true)
+const knownIds = new Set<string | number>()
+let firstLoad = true
+
+function toggleSound() {
+  soundEnabled.value = !soundEnabled.value
+  try { localStorage.setItem(SOUND_KEY, soundEnabled.value ? '1' : '0') } catch {}
+  if (soundEnabled.value) playBeep() // preview + unlocks audio
+}
+
+function playBeep() {
+  if (!soundEnabled.value) return
+  try {
+    const Ctx = window.AudioContext || (window as any).webkitAudioContext
+    const ctx = new Ctx()
+    const osc = ctx.createOscillator()
+    const gain = ctx.createGain()
+    osc.type = 'sine'
+    osc.frequency.value = 880
+    gain.gain.setValueAtTime(0.0001, ctx.currentTime)
+    gain.gain.exponentialRampToValueAtTime(0.3, ctx.currentTime + 0.02)
+    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.4)
+    osc.connect(gain).connect(ctx.destination)
+    osc.start()
+    osc.stop(ctx.currentTime + 0.4)
+    osc.onended = () => ctx.close()
+  } catch {}
+}
+
+function notifyNew(newOnes: any[]) {
+  playBeep()
+  if (!('Notification' in window) || Notification.permission !== 'granted') return
+  const v = newOnes[0]
+  const n = new Notification('New violation detected', {
+    body: newOnes.length === 1
+      ? `${v.plate_number} — ${v.location ?? 'Unknown location'}`
+      : `${newOnes.length} new violations detected`,
+    tag: 'new-violation',
+  })
+  n.onclick = () => {
+    window.focus()
+    if (newOnes.length === 1) selectedId.value = v.id
+    n.close()
+  }
+}
+
+function checkForNew(data: any[]) {
+  const fresh = data.filter(v => !knownIds.has(v.id))
+  data.forEach(v => knownIds.add(v.id))
+  if (firstLoad) { firstLoad = false; return } // no alert on initial page load
+  if (fresh.length) notifyNew(fresh)
+}
+
 async function loadViolations() {
   todayKey.value = toKey(new Date())
 
@@ -334,6 +399,7 @@ async function loadViolations() {
     const data = await $fetch<any[]>('/api/violations')
 
     violations.value = data
+    checkForNew(data)
     const today = new Date().toDateString()
     stats.value.total = data.filter(v => new Date(v.datetime).toDateString() === today).length
     stats.value.unpaid = data.filter(v => v.status === 'Unpaid').length
@@ -348,6 +414,10 @@ async function loadViolations() {
 let timer: ReturnType<typeof setInterval>
 
 onMounted(() => {
+  try { soundEnabled.value = localStorage.getItem(SOUND_KEY) !== '0' } catch {}
+  if ('Notification' in window && Notification.permission === 'default') {
+    Notification.requestPermission()
+  }
   loadViolations()
   timer = setInterval(loadViolations, 5000)
   initMap()

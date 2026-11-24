@@ -6,7 +6,10 @@ export default defineNuxtConfig({
     '@pinia/nuxt',
     '@vueuse/nuxt',
   ],
-   runtimeConfig: {
+  runtimeConfig: {
     djangoBaseUrl: process.env.DJANGO_BASE_URL || 'https://matiketan-api.onrender.com',
+    public: {
+      apiBase: process.env.DJANGO_BASE_URL || 'https://matiketan-api.onrender.com',
+    },
   },
 })

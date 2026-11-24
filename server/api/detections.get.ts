@@ -21,5 +21,5 @@ export default defineEventHandler(async (event) => {
   }
 
   const list = Array.isArray(data) ? data : (data?.results ?? [])
-  return fix(list)
+  return fix(list).map((d: any) => ({ ...d, location: displayLocation(d.location) }))
 })

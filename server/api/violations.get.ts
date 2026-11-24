@@ -1,11 +1,8 @@
-// server/api/violations.get.ts  (or server/api/violations/index.get.ts, wherever your list route lives)
 export default defineEventHandler(async (event) => {
   const data: any[] = await djangoFetch(event, '/api/admin/tickets/search/')
 
   const base = String(useRuntimeConfig(event).djangoBaseUrl ?? '').replace(/\/$/, '')
 
-  // Hosts that are known to be old/local. Add your previous domain or IP here,
-  // e.g. /^(localhost|127\.|10\.|192\.168\.|old-domain\.com|203\.0\.113\.5)/
   const OLD_HOSTS = /^(localhost|127\.|10\.|192\.168\.)/
 
   const STATUS_MAP: Record<string, string> = {
@@ -66,8 +63,10 @@ export default defineEventHandler(async (event) => {
   }
 
   return data.map((raw) => {
-    // Replaces has_signature / signature_url with one violator_signature field
+
     const t = withViolatorSignature(raw)
+
+    console.log('vehicle_color raw:', raw.vehicle_color, '| after:', t.vehicle_color)
 
     const {
       date_issued, enforcer_name, enforcer_badge,
@@ -80,7 +79,8 @@ export default defineEventHandler(async (event) => {
       ...rest,
       id: t.id,
       plate_number: t.plate_number ?? '',
-      location: t.location,
+      vehicle_color: raw.vehicle_color ?? t.vehicle_color ?? '',
+      location: displayLocation(t.location),
       violation: t.violation,
       datetime: date_issued,
       status: STATUS_MAP[String(t.status ?? '').toLowerCase()] ?? 'Unpaid',

@@ -8,8 +8,6 @@ export default defineEventHandler(async (event) => {
 
   const base = String(useRuntimeConfig(event).djangoBaseUrl ?? '').replace(/\/$/, '')
 
-  // Add your previous domain or IP here if it isn't localhost/private,
-  // e.g. /^(localhost|127\.|10\.|192\.168\.|old-domain\.com)/
   const OLD_HOSTS = /^(localhost|127\.|10\.|192\.168\.)/
 
   const fix = (v: any): any => {
@@ -28,5 +26,8 @@ export default defineEventHandler(async (event) => {
     return v
   }
 
-  return fix(data)
+  const out = fix(data)
+  return Array.isArray(out)
+    ? out.map((t: any) => ({ ...t, location: displayLocation(t.location) }))
+    : out
 })

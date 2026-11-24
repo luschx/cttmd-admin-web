@@ -1,4 +1,3 @@
-// server/api/settlement/[code].get.ts
 export default defineEventHandler(async (event) => {
   const code = decodeURIComponent(getRouterParam(event, 'code') || '').trim()
   if (!code) {
@@ -60,6 +59,7 @@ export default defineEventHandler(async (event) => {
 
   return {
     ...withViolatorSignature(t),
+    location: displayLocation(t.location),
     images: [...new Set(images)],
     videos: [...new Set(videos)],
     signature: sig(t.enforcer_signature ?? t.signature),

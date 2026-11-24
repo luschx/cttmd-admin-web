@@ -68,11 +68,20 @@
           class="w-full px-4 py-4 rounded-2xl bg-white/10 hover:bg-white/15 flex items-center gap-3 text-left transition-colors"
           @click="menuOpen = !menuOpen"
         >
-          <div class="w-10 h-10 rounded-full bg-white/20 text-white flex items-center justify-center text-base font-bold shrink-0">
-            A
+          <img
+            v-if="profile.photoUrl"
+            :src="profile.photoUrl"
+            alt="Admin"
+            class="w-10 h-10 rounded-full object-cover shrink-0"
+          />
+          <div
+            v-else
+            class="w-10 h-10 rounded-full bg-white/20 text-white flex items-center justify-center text-base font-bold shrink-0"
+          >
+            {{ profile.initial }}
           </div>
-          <div class="flex-1">
-            <div class="text-sm font-semibold">Hello, admin</div>
+          <div class="flex-1 min-w-0">
+            <div class="text-sm font-semibold truncate">Hello, {{ profile.displayName }}</div>
             <div class="text-xs text-[#34C26B] flex items-center gap-1">
               <span class="w-1.5 h-1.5 rounded-full bg-[#34C26B]"></span> Online
             </div>
@@ -109,6 +118,9 @@ const navItems = [
   { label: 'Reports', to: '/reports', icon: DocumentChartBarIcon },
 ]
 
+// Shared admin profile (same store the Settings page saves to)
+const profile = useAdminProfileStore()
+
 const menuOpen = ref(false)
 const menuRoot = ref<HTMLElement | null>(null)
 
@@ -118,7 +130,10 @@ function onClickOutside(e: MouseEvent) {
   }
 }
 
-onMounted(() => document.addEventListener('click', onClickOutside))
+onMounted(() => {
+  document.addEventListener('click', onClickOutside)
+  if (!profile.loaded) profile.fetch().catch(() => {})
+})
 onUnmounted(() => document.removeEventListener('click', onClickOutside))
 
 function handleLogout() {
