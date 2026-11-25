@@ -71,8 +71,14 @@
 
     <template v-else>
       <!-- Compact cards -->
+      <div v-for="grp in pagedGroups" :key="grp.key" class="mb-5">
+        <div class="flex items-center gap-2 mb-2">
+          <span class="w-2.5 h-2.5 rounded-full" :class="grp.key === 'active' ? 'bg-[#1F9D55]' : 'bg-[#9AA6C0]'"></span>
+          <h3 class="text-sm font-semibold text-[#0F1F4D]">{{ grp.title }}</h3>
+          <span class="text-xs text-[#6B7A99]">{{ grp.items.length }}</span>
+        </div>
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-        <div v-for="officer in paginated" :key="officer.id" class="bg-white rounded-xl shadow-[0_4px_16px_rgba(15,31,77,0.06)] p-3.5">
+        <div v-for="officer in grp.items" :key="officer.id" @click="openView(officer)" class="bg-white rounded-xl shadow-[0_4px_16px_rgba(15,31,77,0.06)] hover:shadow-[0_6px_20px_rgba(41,82,217,0.18)] p-3.5 cursor-pointer transition-shadow">
           <div class="flex items-center gap-2.5">
             <div class="w-10 h-10 rounded-full bg-[#EAF0FF] flex items-center justify-center shrink-0 overflow-hidden">
               <img v-if="officer.photo_url" :src="officer.photo_url" :alt="officer.name" class="w-full h-full object-cover" />
@@ -84,28 +90,15 @@
               <div class="text-sm font-semibold text-[#0F1F4D] truncate">{{ officer.name }}</div>
               <div class="text-[11px] text-[#6B7A99]">{{ officer.officer_code }}</div>
             </div>
-            <span :class="officer.status === 'Active' ? 'bg-[#1F9D55]' : 'bg-[#9AA6C0]'" class="w-2.5 h-2.5 rounded-full shrink-0" :title="officer.status"></span>
-          </div>
-
-          <div class="mt-3 text-xs text-[#6B7A99] truncate" :title="officer.zone">{{ officer.zone || '—' }}</div>
-          <div class="mt-1 text-xs text-[#6B7A99] truncate">{{ officer.phone_number || 'No phone number' }}</div>
-
-          <div class="mt-2 pt-2 border-t border-[#F0F4FB] flex items-center justify-between">
-            <span class="text-[11px] text-[#6B7A99]"><span class="font-semibold text-[#0F1F4D]">{{ officer.violation_count ?? 0 }}</span> violations</span>
-            <div class="flex items-center">
-              <button @click="openEdit(officer)" title="Edit enforcer" class="p-1 rounded-md text-[#6B7A99] hover:text-[#2952D9] hover:bg-[#EAF0FF] transition-colors">
-                <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                </svg>
-              </button>
-              <button @click="askDelete(officer)" title="Delete enforcer" class="p-1 rounded-md text-[#6B7A99] hover:text-[#E5484D] hover:bg-[#FDECEC] transition-colors">
-                <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                </svg>
-              </button>
-            </div>
+            <span
+              class="text-[11px] font-semibold rounded-lg px-2 py-0.5 shrink-0"
+              :class="officer.status === 'Active' ? 'bg-[#E3F6EB] text-[#1F9D55]' : 'bg-[#F0F4FB] text-[#6B7A99]'"
+            >
+              {{ officer.status === 'Active' ? 'Active' : 'Offline' }}
+            </span>
           </div>
         </div>
+      </div>
       </div>
 
       <!-- Pagination -->
@@ -183,8 +176,15 @@
       <div v-if="!areaOfficers.length" class="text-center text-[#9AA6C0] text-sm py-10">
         No enforcer is assigned to this area yet
       </div>
-      <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-        <div v-for="o in areaOfficers" :key="o.id" class="bg-white rounded-xl shadow-[0_4px_16px_rgba(15,31,77,0.06)] p-3.5">
+      <div v-else>
+      <div v-for="grp in areaGroupsList" :key="grp.key" class="mb-5">
+        <div class="flex items-center gap-2 mb-2">
+          <span class="w-2.5 h-2.5 rounded-full" :class="grp.key === 'active' ? 'bg-[#1F9D55]' : 'bg-[#9AA6C0]'"></span>
+          <h3 class="text-sm font-semibold text-[#0F1F4D]">{{ grp.title }}</h3>
+          <span class="text-xs text-[#6B7A99]">{{ grp.items.length }}</span>
+        </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+        <div v-for="o in grp.items" :key="o.id" @click="openView(o)" class="bg-white rounded-xl shadow-[0_4px_16px_rgba(15,31,77,0.06)] hover:shadow-[0_6px_20px_rgba(41,82,217,0.18)] p-3.5 cursor-pointer transition-shadow">
           <div class="flex items-center gap-2.5">
             <div class="w-10 h-10 rounded-full bg-[#EAF0FF] flex items-center justify-center shrink-0 overflow-hidden">
               <img v-if="o.photo_url" :src="o.photo_url" :alt="o.name" class="w-full h-full object-cover" />
@@ -196,28 +196,16 @@
               <div class="text-sm font-semibold text-[#0F1F4D] truncate">{{ o.name }}</div>
               <div class="text-[11px] text-[#6B7A99]">{{ o.officer_code }}</div>
             </div>
-            <span :class="o.status === 'Active' ? 'bg-[#1F9D55]' : 'bg-[#9AA6C0]'" class="w-2.5 h-2.5 rounded-full shrink-0" :title="o.status"></span>
-          </div>
-
-          <div class="mt-3 text-xs text-[#6B7A99] truncate" :title="o.zone">{{ o.zone || '—' }}</div>
-          <div class="mt-1 text-xs text-[#6B7A99] truncate">{{ o.phone_number || 'No phone number' }}</div>
-
-          <div class="mt-2 pt-2 border-t border-[#F0F4FB] flex items-center justify-between">
-            <span class="text-[11px] text-[#6B7A99]"><span class="font-semibold text-[#0F1F4D]">{{ o.violation_count ?? 0 }}</span> violations</span>
-            <div class="flex items-center">
-              <button @click="openEdit(o)" title="Edit enforcer" class="p-1 rounded-md text-[#6B7A99] hover:text-[#2952D9] hover:bg-[#EAF0FF] transition-colors">
-                <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                </svg>
-              </button>
-              <button @click="askDelete(o)" title="Delete enforcer" class="p-1 rounded-md text-[#6B7A99] hover:text-[#E5484D] hover:bg-[#FDECEC] transition-colors">
-                <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                </svg>
-              </button>
-            </div>
+            <span
+              class="text-[11px] font-semibold rounded-lg px-2 py-0.5 shrink-0"
+              :class="o.status === 'Active' ? 'bg-[#E3F6EB] text-[#1F9D55]' : 'bg-[#F0F4FB] text-[#6B7A99]'"
+            >
+              {{ o.status === 'Active' ? 'Active' : 'Offline' }}
+            </span>
           </div>
         </div>
+      </div>
+      </div>
       </div>
     </div>
 
@@ -301,7 +289,24 @@
 
             <div>
               <label class="block text-sm font-semibold text-[#0F1F4D] mb-1">Password</label>
-              <input v-model="form.password" type="password" :required="!editingId" minlength="6" :placeholder="editingId ? 'Leave blank to keep current password' : 'At least 6 characters'" class="w-full bg-[#F0F4FB] text-[#0F1F4D] placeholder-[#9AA6C0] rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#2952D9]" />
+              <div class="relative">
+                <input
+                  v-model="form.password"
+                  :type="showPassword ? 'text' : 'password'"
+                  :required="!editingId"
+                  minlength="6"
+                  autocomplete="new-password"
+                  :placeholder="editingId ? 'Leave blank to keep current password' : 'At least 6 characters'"
+                  class="w-full bg-[#F0F4FB] text-[#0F1F4D] placeholder-[#9AA6C0] rounded-xl px-4 py-3 pr-16 text-sm focus:outline-none focus:ring-2 focus:ring-[#2952D9]"
+                />
+                <button
+                  type="button"
+                  @click="showPassword = !showPassword"
+                  class="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-[#2952D9] hover:underline"
+                >
+                  {{ showPassword ? 'Hide' : 'Show' }}
+                </button>
+              </div>
             </div>
 
             <!-- Zone picker (Butuan City only) -->
@@ -364,6 +369,66 @@
               </button>
             </div>
           </form>
+        </div>
+      </div>
+
+      <!-- Details modal -->
+      <div
+        v-if="viewTarget"
+        class="fixed inset-0 bg-[#0B1A3B]/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+        @click.self="closeView"
+      >
+        <div class="bg-white rounded-3xl shadow-[0_8px_32px_rgba(11,26,59,0.35)] w-full max-w-md overflow-hidden">
+          <div class="bg-gradient-to-br from-[#0B1A3B] via-[#1B3262] to-[#2952D9] text-white px-6 py-6 flex items-center gap-4 relative">
+            <div class="w-20 h-20 rounded-full bg-[#EAF0FF] ring-4 ring-white/80 flex items-center justify-center shrink-0 overflow-hidden">
+              <img v-if="viewTarget.photo_url" :src="viewTarget.photo_url" :alt="viewTarget.name" class="w-full h-full object-cover" />
+              <svg v-else xmlns="http://www.w3.org/2000/svg" class="w-9 h-9 text-[#2952D9]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
+            </div>
+            <div class="min-w-0">
+              <h2 class="text-xl font-bold truncate">{{ viewTarget.name }}</h2>
+              <div class="text-sm text-white/70">{{ viewTarget.officer_code }}</div>
+              <span
+                class="inline-block mt-2 text-xs font-semibold rounded-lg px-2.5 py-0.5"
+                :class="viewTarget.status === 'Active' ? 'bg-[#1F9D55] text-white' : 'bg-white/20 text-white'"
+              >
+                {{ viewTarget.status === 'Active' ? 'Active' : 'Offline' }}
+              </span>
+            </div>
+            <button @click="closeView" class="absolute top-3 right-4 text-white/70 hover:text-white text-2xl leading-none">&times;</button>
+          </div>
+
+          <div class="p-6 space-y-4">
+            <div>
+              <div class="text-xs text-[#6B7A99]">Badge ID</div>
+              <div class="text-sm font-semibold text-[#0F1F4D]">{{ viewTarget.officer_code }}</div>
+            </div>
+            <div>
+              <div class="text-xs text-[#6B7A99]">Phone number</div>
+              <div class="text-sm font-semibold text-[#0F1F4D]">{{ viewTarget.phone_number || 'No phone number' }}</div>
+            </div>
+            <div>
+              <div class="text-xs text-[#6B7A99]">Assigned zone</div>
+              <div class="text-sm font-semibold text-[#0F1F4D]">{{ viewTarget.zone && viewTarget.zone !== '—' ? viewTarget.zone : 'Not assigned' }}</div>
+            </div>
+            <div>
+              <div class="text-xs text-[#6B7A99]">Violations issued</div>
+              <div class="text-2xl font-bold text-[#2952D9] leading-tight">{{ viewTarget.violation_count ?? 0 }}</div>
+            </div>
+
+            <div class="flex justify-end gap-3 pt-2">
+              <button @click="closeView" class="bg-[#F0F4FB] text-[#3B4A6B] rounded-xl px-5 py-3 text-sm font-semibold hover:bg-[#E3EAFF] transition-colors">
+                Close
+              </button>
+              <button @click="deleteFromView" class="bg-[#FDECEC] text-[#E5484D] rounded-xl px-5 py-3 text-sm font-semibold hover:opacity-80 transition">
+                Delete
+              </button>
+              <button @click="editFromView" class="bg-gradient-to-r from-[#1B3262] to-[#2952D9] text-white rounded-xl px-5 py-3 text-sm font-semibold shadow-[0_4px_16px_rgba(41,82,217,0.35)] hover:opacity-90 transition">
+                Edit
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -463,6 +528,7 @@ const showModal = ref(false)
 const saving = ref(false)
 const formError = ref('')
 const editingId = ref<number | null>(null)
+const showPassword = ref(false)
 const form = reactive({
   name: '',
   badge_id: '',
@@ -471,6 +537,29 @@ const form = reactive({
   zone: '',
   is_active: true,
 })
+
+// ---- Details view ----
+const viewTarget = ref<any>(null)
+
+function openView(officer: any) {
+  viewTarget.value = officer
+}
+
+function closeView() {
+  viewTarget.value = null
+}
+
+function editFromView() {
+  const o = viewTarget.value
+  closeView()
+  if (o) openEdit(o)
+}
+
+function deleteFromView() {
+  const o = viewTarget.value
+  closeView()
+  if (o) askDelete(o)
+}
 
 const deleteTarget = ref<any>(null)
 const deleting = ref(false)
@@ -708,6 +797,7 @@ function openModal() {
   form.phone_number = ''
   form.password = ''
   form.is_active = true
+  showPassword.value = false
   clearZone()
   resetPhoto()
   formError.value = ''
@@ -721,6 +811,7 @@ function openEdit(officer: any) {
   form.phone_number = officer.phone_number ?? ''
   form.password = ''
   form.is_active = officer.status === 'Active'
+  showPassword.value = false
   const z = officer.zone && officer.zone !== '—' ? officer.zone : ''
   form.zone = z
   zoneQuery.value = z
@@ -801,7 +892,18 @@ const filtered = computed(() => {
       o.officer_code.toLowerCase().includes(s) ||
       (o.phone_number ?? '').includes(s)
   )
+  .sort((a, b) => Number(b.status === 'Active') - Number(a.status === 'Active'))
 })
+
+// Split a list into Active and Offline groups
+function splitGroups(list: any[]) {
+  const active = list.filter((o) => o.status === 'Active')
+  const offline = list.filter((o) => o.status !== 'Active')
+  return [
+    { key: 'active', title: 'Active', items: active },
+    { key: 'offline', title: 'Offline', items: offline },
+  ].filter((g) => g.items.length)
+}
 
 const totalPages = computed(() => Math.max(1, Math.ceil(filtered.value.length / pageSize.value)))
 
@@ -809,6 +911,8 @@ const paginated = computed(() => {
   const start = (page.value - 1) * pageSize.value
   return filtered.value.slice(start, start + pageSize.value)
 })
+
+const pagedGroups = computed(() => splitGroups(paginated.value))
 
 const rangeStart = computed(() => (filtered.value.length ? (page.value - 1) * pageSize.value + 1 : 0))
 const rangeEnd = computed(() => Math.min(page.value * pageSize.value, filtered.value.length))
@@ -881,6 +985,7 @@ const areaGroups = computed(() => {
 })
 
 const areaOfficers = computed(() => officersByZone.value.get(areaSelected.value) ?? [])
+const areaGroupsList = computed(() => splitGroups(areaOfficers.value))
 const areaActiveCount = computed(() => areaOfficers.value.filter((o) => o.status === 'Active').length)
 
 function pickArea(label: string) {
